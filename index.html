@@ -1,157 +1,1066 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nearby Restaurants (OSM)</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        body { margin: 0; padding: 0; font-family: sans-serif; }
-        #map { height: 100vh; width: 100%; }
-        #status { position: absolute; top: 10px; left: 50px; z-index: 1000; background: white; padding: 8px 15px; border-radius: 4px; box-shadow: 0 1px 5px rgba(0,0,0,0.3); }
-        .restaurant-info { max-width: 250px; }
-        .restaurant-info h4 { margin: 0 0 5px 0; color: #333; }
-        .restaurant-info p { margin: 3px 0; font-size: 13px; color: #666; }
-        .cuisine-tag { display: inline-block; background: #e8f5e9; color: #2e7d32; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-top: 5px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BillEase Pro · Multi-Item Billing + Calculator</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: linear-gradient(145deg, #f6f9fc 0%, #e9f1f8 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .app-card {
+      max-width: 1280px;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(8px);
+      border-radius: 40px;
+      box-shadow: 0 20px 40px -10px rgba(0, 30, 60, 0.25), 0 10px 20px -8px rgba(0, 0, 0, 0.15);
+      padding: 30px 28px;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      margin: 10px 0;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: #0b2b4a;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    h1 span {
+      background: #1e6f9f;
+      color: white;
+      font-size: 0.95rem;
+      padding: 4px 14px;
+      border-radius: 40px;
+      font-weight: 400;
+      letter-spacing: 0.3px;
+    }
+
+    .subhead {
+      color: #3b5d7a;
+      font-size: 0.95rem;
+      margin-bottom: 26px;
+      border-left: 4px solid #1e6f9f;
+      padding-left: 16px;
+      background: rgba(30, 111, 159, 0.04);
+      border-radius: 0 8px 8px 0;
+    }
+
+    /* Main layout: 2 columns */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    @media (max-width: 1000px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+        gap: 18px;
+      }
+    }
+
+    .left-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .panel {
+      background: white;
+      border-radius: 28px;
+      padding: 22px 20px;
+      box-shadow: 0 8px 18px rgba(0, 20, 40, 0.06);
+      border: 1px solid #d9e6f2;
+    }
+
+    .panel h2 {
+      font-size: 1.3rem;
+      font-weight: 500;
+      color: #154b6e;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 2px dashed #cbddee;
+      padding-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    /* Item form */
+    .item-form {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr 0.8fr 0.8fr 0.8fr auto;
+      gap: 10px;
+      align-items: end;
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #eaf1f9;
+    }
+
+    @media (max-width: 800px) {
+      .item-form {
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .item-form .field-group {
+        margin-bottom: 0;
+      }
+      .item-form .add-btn-wrapper {
+        grid-column: span 2;
+      }
+    }
+
+    .field-group {
+      margin-bottom: 0;
+    }
+
+    .field-group label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #1d3b57;
+      margin-bottom: 4px;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+    }
+
+    .field-group label span.unit {
+      font-weight: 400;
+      color: #5f7e9c;
+      font-size: 0.7rem;
+      background: #eaf1f9;
+      padding: 1px 8px;
+      border-radius: 20px;
+      text-transform: none;
+    }
+
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-wrapper .prefix {
+      position: absolute;
+      left: 12px;
+      font-weight: 500;
+      color: #3f6a8c;
+      font-size: 0.85rem;
+      pointer-events: none;
+    }
+
+    .input-wrapper input {
+      width: 100%;
+      padding: 10px 10px 10px 32px;
+      border: 1.5px solid #cbddee;
+      border-radius: 14px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #0a263b;
+      background: #fbfdff;
+      outline: none;
+      transition: 0.15s;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+
+    .input-wrapper input:focus {
+      border-color: #1e6f9f;
+      box-shadow: 0 0 0 3px rgba(30, 111, 159, 0.15);
+      background: white;
+    }
+
+    .input-wrapper.name-input input {
+      padding-left: 12px;
+    }
+
+    .add-btn-wrapper {
+      display: flex;
+      align-items: flex-end;
+    }
+
+    .add-btn {
+      background: #1e6f9f;
+      color: white;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 14px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: 0.15s;
+      white-space: nowrap;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: inherit;
+    }
+
+    .add-btn:hover {
+      background: #155f8a;
+      transform: translateY(-1px);
+    }
+
+    .add-btn:active {
+      transform: scale(0.97);
+    }
+
+    /* Items table */
+    .items-table-wrapper {
+      overflow-x: auto;
+      margin-top: 8px;
+    }
+
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .items-table th {
+      text-align: left;
+      padding: 8px 6px;
+      color: #3f6a8c;
+      font-weight: 600;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 2px solid #e2eefb;
+      white-space: nowrap;
+    }
+
+    .items-table td {
+      padding: 10px 6px;
+      border-bottom: 1px solid #eaf1f9;
+      color: #0b2b4a;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+
+    .items-table td.item-name {
+      font-family: system-ui, sans-serif;
+      font-weight: 600;
+      color: #154b6e;
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .items-table .subtotal {
+      font-weight: 700;
+      color: #1e6f9f;
+    }
+
+    .remove-btn {
+      background: #fce9e9;
+      color: #b33a3a;
+      border: 1px solid #f0c4c4;
+      padding: 4px 10px;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      font-weight: 600;
+      transition: 0.1s;
+      font-family: inherit;
+    }
+
+    .remove-btn:hover {
+      background: #f8d7d7;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 26px 10px;
+      color: #7a9cbb;
+      font-size: 0.9rem;
+      border: 2px dashed #d9e6f2;
+      border-radius: 18px;
+      margin-top: 8px;
+    }
+
+    .empty-state strong {
+      color: #1e6f9f;
+    }
+
+    /* Results panel (right) */
+    .results-panel {
+      background: #0b2b4a;
+      color: white;
+      border-radius: 28px;
+      padding: 26px 22px;
+      box-shadow: 0 18px 30px -10px rgba(0, 40, 70, 0.4);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100%;
+    }
+
+    .results-panel h2 {
+      color: #c1ddf5;
+      border-bottom-color: #1e4e72;
+      font-weight: 400;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .breakup {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin: 8px 0 18px;
+    }
+
+    .breakup-item {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.95rem;
+      border-bottom: 1px dashed #2d5473;
+      padding-bottom: 8px;
+      color: #c9def0;
+    }
+
+    .breakup-item .value {
+      font-weight: 600;
+      color: white;
+      font-family: 'SF Mono', monospace;
+    }
+
+    .discount-badge {
+      background: #1e6f9f;
+      padding: 2px 10px;
+      border-radius: 50px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: white;
+      margin-left: 8px;
+    }
+
+    .grand-total {
+      background: #133f5e;
+      border-radius: 20px;
+      padding: 18px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 12px 0 10px;
+      border: 1px solid #2a6a94;
+    }
+
+    .grand-total .label {
+      font-size: 1.1rem;
+      font-weight: 400;
+      color: #b8d9f5;
+    }
+
+    .grand-total .amount {
+      font-size: 1.9rem;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.5px;
+      font-family: 'SF Mono', monospace;
+      line-height: 1;
+    }
+
+    .grand-total .amount small {
+      font-size: 1rem;
+      font-weight: 400;
+      color: #8bb9df;
+      margin-right: 4px;
+    }
+
+    .reset-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1.5px solid #3f739b;
+      color: #d3e9ff;
+      padding: 13px 18px;
+      border-radius: 40px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 14px;
+      width: 100%;
+      font-family: inherit;
+    }
+
+    .reset-btn:hover {
+      background: #1e6f9f;
+      color: white;
+      border-color: #1e6f9f;
+    }
+
+    .tiny-note {
+      font-size: 0.72rem;
+      color: #7a9cbb;
+      margin-top: 16px;
+      text-align: center;
+      border-top: 1px solid #1b4160;
+      padding-top: 16px;
+    }
+
+    /* Calculator */
+    .calc-panel {
+      background: white;
+      border-radius: 28px;
+      padding: 20px 18px;
+      box-shadow: 0 8px 18px rgba(0, 20, 40, 0.06);
+      border: 1px solid #d9e6f2;
+    }
+
+    .calc-panel h2 {
+      font-size: 1.2rem;
+      font-weight: 500;
+      color: #154b6e;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 2px dashed #cbddee;
+      padding-bottom: 10px;
+    }
+
+    .calc-display {
+      width: 100%;
+      padding: 16px 18px;
+      background: #f2f7fc;
+      border: 1.5px solid #cbddee;
+      border-radius: 18px;
+      font-size: 1.6rem;
+      font-weight: 600;
+      text-align: right;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      color: #0b2b4a;
+      margin-bottom: 14px;
+      overflow-x: auto;
+      white-space: nowrap;
+      letter-spacing: 0.5px;
+    }
+
+    .calc-buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 9px;
+    }
+
+    .calc-btn {
+      padding: 14px 8px;
+      font-size: 1.05rem;
+      font-weight: 500;
+      border: 1.5px solid #d9e6f2;
+      border-radius: 16px;
+      background: #fbfdff;
+      color: #0b2b4a;
+      cursor: pointer;
+      transition: 0.1s;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      user-select: none;
+    }
+
+    .calc-btn:hover {
+      background: #eaf2fa;
+      border-color: #aac4dd;
+    }
+
+    .calc-btn:active {
+      transform: scale(0.96);
+      background: #d9e8f5;
+    }
+
+    .calc-btn.operator {
+      background: #e4eff9;
+      color: #1e6f9f;
+      font-weight: 600;
+    }
+
+    .calc-btn.operator:hover {
+      background: #d0e2f2;
+    }
+
+    .calc-btn.equal {
+      background: #1e6f9f;
+      color: white;
+      border-color: #1e6f9f;
+      grid-column: span 2;
+    }
+
+    .calc-btn.equal:hover {
+      background: #155f8a;
+    }
+
+    .calc-btn.clear {
+      background: #fce9e9;
+      color: #b33a3a;
+      border-color: #f0c4c4;
+    }
+
+    .calc-btn.clear:hover {
+      background: #f8d7d7;
+    }
+
+    .hint {
+      font-size: 0.72rem;
+      color: #7a9cbb;
+      margin-top: 4px;
+      margin-left: 2px;
+    }
+
+    /* toast for feedback */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #0b2b4a;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 40px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      box-shadow: 0 10px 30px rgba(0, 20, 40, 0.3);
+      opacity: 0;
+      transition: 0.25s ease;
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .toast.error {
+      background: #b33a3a;
+    }
+  </style>
 </head>
 <body>
-    <div id="status">Getting your location...</div>
-    <div id="map"></div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
-        const map = L.map('map').setView([0, 0], 2);
-        
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            maxZoom: 19
-        }).addTo(map);
+<div class="app-card">
+  <h1>
+    🧾 BillEase Pro
+    <span>Multi-Item · Disc% · Tax% · Calculator</span>
+  </h1>
+  <div class="subhead">
+    Add multiple custom items with their own name, MRP, qty, discount & tax. Each item's final value is summed automatically.
+  </div>
 
-        const statusDiv = document.getElementById('status');
+  <div class="main-grid">
+    <!-- LEFT COLUMN -->
+    <div class="left-stack">
+      <!-- ITEMS PANEL -->
+      <div class="panel">
+        <h2>📦 Custom items</h2>
 
-        // 1. Get user location
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
-                    
-                    map.setView([lat, lon], 15);
-                    statusDiv.textContent = 'Searching for restaurants nearby...';
-                    
-                    // Add user location marker
-                    L.circleMarker([lat, lon], {
-                        radius: 8, fillColor: '#4285F4', color: '#fff', weight: 2, fillOpacity: 1
-                    }).addTo(map).bindPopup('You are here');
-                    
-                    // 2. Query Overpass API for restaurants within 1km
-                    fetchRestaurants(lat, lon, 1000);
-                },
-                (error) => {
-                    statusDiv.textContent = 'Location failed: ' + error.message + '. Showing default view.';
-                    map.setView([40.7128, -74.0060], 13); // Default New York
-                }
-            );
+        <!-- Add item form -->
+        <div class="item-form" id="itemForm">
+          <div class="field-group">
+            <label>Item name</label>
+            <div class="input-wrapper name-input">
+              <input type="text" id="newItemName" placeholder="e.g. Headphones" maxlength="40">
+            </div>
+          </div>
+          <div class="field-group">
+            <label>MRP <span class="unit">₹</span></label>
+            <div class="input-wrapper">
+              <span class="prefix">₹</span>
+              <input type="number" id="newItemMrp" value="999.00" step="0.01" min="0">
+            </div>
+          </div>
+          <div class="field-group">
+            <label>Qty</label>
+            <div class="input-wrapper">
+              <span class="prefix">#</span>
+              <input type="number" id="newItemQty" value="1" step="1" min="1">
+            </div>
+          </div>
+          <div class="field-group">
+            <label>Disc <span class="unit">%</span></label>
+            <div class="input-wrapper">
+              <span class="prefix">%</span>
+              <input type="number" id="newItemDisc" value="10" step="0.01" min="0" max="100">
+            </div>
+          </div>
+          <div class="field-group">
+            <label>Tax <span class="unit">%</span></label>
+            <div class="input-wrapper">
+              <span class="prefix">%</span>
+              <input type="number" id="newItemTax" value="18" step="0.01" min="0" max="100">
+            </div>
+          </div>
+          <div class="add-btn-wrapper">
+            <button class="add-btn" id="addItemBtn">+ Add</button>
+          </div>
+        </div>
+
+        <!-- Items table -->
+        <div class="items-table-wrapper">
+          <table class="items-table" id="itemsTable">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>MRP</th>
+                <th>Qty</th>
+                <th>Disc%</th>
+                <th>Tax%</th>
+                <th>Final (₹)</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="itemsTableBody">
+              <!-- filled by JS -->
+            </tbody>
+          </table>
+        </div>
+        <div id="emptyState" class="empty-state">
+          No items yet. <strong>Add your first item</strong> using the form above.
+        </div>
+        <div class="hint" style="margin-top:12px;">💡 Each item's final value = (MRP × Qty − Discount%) + Tax%</div>
+      </div>
+
+      <!-- CALCULATOR PANEL -->
+      <div class="calc-panel">
+        <h2>🧮 Quick calculator</h2>
+        <div class="calc-display" id="calcDisplay">0</div>
+        <div class="calc-buttons">
+          <button class="calc-btn clear" data-action="clear">AC</button>
+          <button class="calc-btn" data-action="backspace">⌫</button>
+          <button class="calc-btn operator" data-action="percent">%</button>
+          <button class="calc-btn operator" data-action="divide">÷</button>
+          <button class="calc-btn" data-digit="7">7</button>
+          <button class="calc-btn" data-digit="8">8</button>
+          <button class="calc-btn" data-digit="9">9</button>
+          <button class="calc-btn operator" data-action="multiply">×</button>
+          <button class="calc-btn" data-digit="4">4</button>
+          <button class="calc-btn" data-digit="5">5</button>
+          <button class="calc-btn" data-digit="6">6</button>
+          <button class="calc-btn operator" data-action="subtract">−</button>
+          <button class="calc-btn" data-digit="1">1</button>
+          <button class="calc-btn" data-digit="2">2</button>
+          <button class="calc-btn" data-digit="3">3</button>
+          <button class="calc-btn operator" data-action="add">+</button>
+          <button class="calc-btn" data-digit="0">0</button>
+          <button class="calc-btn" data-action="decimal">.</button>
+          <button class="calc-btn equal" data-action="equals">=</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN: RESULTS PANEL -->
+    <div class="results-panel">
+      <h2>📊 Bill summary</h2>
+
+      <div class="breakup">
+        <div class="breakup-item">
+          <span>Total MRP (all items)</span>
+          <span class="value" id="totalMrpDisplay">₹0.00</span>
+        </div>
+        <div class="breakup-item">
+          <span>Total discount</span>
+          <span class="value" id="discountAmountDisplay">- ₹0.00</span>
+        </div>
+        <div class="breakup-item">
+          <span>Taxable value</span>
+          <span class="value" id="taxableValueDisplay">₹0.00</span>
+        </div>
+        <div class="breakup-item">
+          <span>Total tax</span>
+          <span class="value" id="taxAmountDisplay">+ ₹0.00</span>
+        </div>
+        <div class="breakup-item">
+          <span>Items count</span>
+          <span class="value" id="itemsCountDisplay">0</span>
+        </div>
+      </div>
+
+      <div class="grand-total">
+        <span class="label">Grand total</span>
+        <span class="amount" id="grandTotalDisplay"><small>₹</small>0.00</span>
+      </div>
+
+      <button class="reset-btn" id="resetBtn">
+        ⟲ Reset all items
+      </button>
+      <div class="tiny-note">
+        ⚡ Live per-item calculation · Discount on MRP · Tax on discounted price
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  (function() {
+    'use strict';
+
+    // ---------- STATE ----------
+    let items = [];   // each: { id, name, mrp, qty, discountPercent, taxPercent }
+
+    // DOM refs
+    const itemsTableBody = document.getElementById('itemsTableBody');
+    const emptyState = document.getElementById('emptyState');
+    const addItemBtn = document.getElementById('addItemBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    // New item form inputs
+    const newItemName = document.getElementById('newItemName');
+    const newItemMrp = document.getElementById('newItemMrp');
+    const newItemQty = document.getElementById('newItemQty');
+    const newItemDisc = document.getElementById('newItemDisc');
+    const newItemTax = document.getElementById('newItemTax');
+
+    // Summary displays
+    const totalMrpDisplay = document.getElementById('totalMrpDisplay');
+    const discountAmountDisplay = document.getElementById('discountAmountDisplay');
+    const taxableValueDisplay = document.getElementById('taxableValueDisplay');
+    const taxAmountDisplay = document.getElementById('taxAmountDisplay');
+    const itemsCountDisplay = document.getElementById('itemsCountDisplay');
+    const grandTotalDisplay = document.getElementById('grandTotalDisplay');
+
+    // ---------- HELPERS ----------
+    function formatCurrency(value) {
+      return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(value);
+    }
+
+    function formatNumberOnly(value) {
+      return new Intl.NumberFormat('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(value);
+    }
+
+    // calculate per-item totals
+    function computeItemTotals(item) {
+      const mrp = item.mrp;
+      const qty = item.qty;
+      const disc = item.discountPercent;
+      const tax = item.taxPercent;
+
+      const totalMrp = mrp * qty;
+      const discountAmount = totalMrp * (disc / 100);
+      const taxableValue = totalMrp - discountAmount;
+      const taxAmount = taxableValue * (tax / 100);
+      const finalValue = taxableValue + taxAmount;
+
+      return { totalMrp, discountAmount, taxableValue, taxAmount, finalValue };
+    }
+
+    // ---------- RENDER ----------
+    function renderItemsTable() {
+      if (items.length === 0) {
+        itemsTableBody.innerHTML = '';
+        emptyState.style.display = 'block';
+        return;
+      }
+      emptyState.style.display = 'none';
+
+      let html = '';
+      items.forEach(item => {
+        const t = computeItemTotals(item);
+        html += `
+          <tr>
+            <td class="item-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</td>
+            <td>₹${item.mrp.toFixed(2)}</td>
+            <td>${item.qty}</td>
+            <td>${item.discountPercent.toFixed(1)}%</td>
+            <td>${item.taxPercent.toFixed(1)}%</td>
+            <td class="subtotal">₹${t.finalValue.toFixed(2)}</td>
+            <td><button class="remove-btn" data-id="${item.id}">✕</button></td>
+          </tr>
+        `;
+      });
+      itemsTableBody.innerHTML = html;
+
+      // attach remove listeners
+      document.querySelectorAll('.remove-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const id = Number(btn.getAttribute('data-id'));
+          removeItem(id);
+        });
+      });
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function updateSummary() {
+      let totalMrpSum = 0;
+      let discountSum = 0;
+      let taxableSum = 0;
+      let taxSum = 0;
+      let grandTotalSum = 0;
+
+      items.forEach(item => {
+        const t = computeItemTotals(item);
+        totalMrpSum += t.totalMrp;
+        discountSum += t.discountAmount;
+        taxableSum += t.taxableValue;
+        taxSum += t.taxAmount;
+        grandTotalSum += t.finalValue;
+      });
+
+      totalMrpDisplay.textContent = formatCurrency(totalMrpSum);
+      discountAmountDisplay.textContent = `- ${formatCurrency(discountSum)}`;
+      taxableValueDisplay.textContent = formatCurrency(taxableSum);
+      taxAmountDisplay.textContent = `+ ${formatCurrency(taxSum)}`;
+      itemsCountDisplay.textContent = items.length;
+      
+      const formattedGrand = formatNumberOnly(grandTotalSum);
+      grandTotalDisplay.innerHTML = `<small>₹</small>${formattedGrand}`;
+    }
+
+    function refreshAll() {
+      renderItemsTable();
+      updateSummary();
+    }
+
+    // ---------- ITEM CRUD ----------
+    function addItem() {
+      // read values
+      let name = newItemName.value.trim();
+      let mrp = parseFloat(newItemMrp.value);
+      let qty = parseFloat(newItemQty.value);
+      let disc = parseFloat(newItemDisc.value);
+      let tax = parseFloat(newItemTax.value);
+
+      // validation
+      if (!name) name = 'Item ' + (items.length + 1);
+      
+      mrp = isNaN(mrp) || mrp < 0 ? 0 : mrp;
+      qty = isNaN(qty) || qty < 1 ? 1 : Math.floor(qty);
+      disc = isNaN(disc) ? 0 : Math.min(100, Math.max(0, disc));
+      tax = isNaN(tax) ? 0 : Math.min(100, Math.max(0, tax));
+
+      // create item
+      const item = {
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        name: name.substring(0, 40),
+        mrp: mrp,
+        qty: qty,
+        discountPercent: disc,
+        taxPercent: tax
+      };
+
+      items.push(item);
+
+      // reset form a bit (keep name cleared, set reasonable defaults)
+      newItemName.value = '';
+      newItemMrp.value = '999.00';
+      newItemQty.value = '1';
+      newItemDisc.value = '10';
+      newItemTax.value = '18';
+      newItemName.focus();
+
+      refreshAll();
+      showToast(`"${escapeHtml(item.name)}" added`);
+    }
+
+    function removeItem(id) {
+      const index = items.findIndex(i => i.id === id);
+      if (index !== -1) {
+        const removed = items[index];
+        items.splice(index, 1);
+        refreshAll();
+        showToast(`"${escapeHtml(removed.name)}" removed`);
+      }
+    }
+
+    function resetAll() {
+      if (items.length === 0) {
+        showToast('No items to reset', true);
+        return;
+      }
+      if (confirm('Remove all items and reset the bill?')) {
+        items = [];
+        refreshAll();
+        showToast('All items removed');
+      }
+    }
+
+    // toast
+    let toastTimeout;
+    function showToast(msg, isError = false) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.toggle('error', isError);
+      toast.classList.add('show');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2000);
+    }
+
+    // ---------- EVENT LISTENERS ----------
+    addItemBtn.addEventListener('click', addItem);
+
+    // press Enter in any new item input triggers add
+    [newItemName, newItemMrp, newItemQty, newItemDisc, newItemTax].forEach(inp => {
+      inp.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          addItem();
+        }
+      });
+    });
+
+    // sanitize on blur
+    newItemQty.addEventListener('blur', function() {
+      let v = parseFloat(this.value);
+      if (isNaN(v) || v < 1) this.value = 1;
+      else this.value = Math.floor(v);
+    });
+    [newItemMrp, newItemDisc, newItemTax].forEach(inp => {
+      inp.addEventListener('blur', function() {
+        let v = parseFloat(this.value);
+        if (isNaN(v) || v < 0) this.value = 0;
+        if (v > 100 && (this === newItemDisc || this === newItemTax)) this.value = 100;
+      });
+    });
+
+    resetBtn.addEventListener('click', resetAll);
+
+    // ---------- CALCULATOR LOGIC ----------
+    const calcDisplay = document.getElementById('calcDisplay');
+    let currentInput = '0';
+    let pendingOperator = null;
+    let leftOperand = null;
+    let waitingForOperand = false;
+
+    function updateCalcDisplay() {
+      if (currentInput.length > 16) currentInput = currentInput.slice(0, 16);
+      calcDisplay.textContent = currentInput;
+    }
+
+    function clearCalculator() {
+      currentInput = '0';
+      pendingOperator = null;
+      leftOperand = null;
+      waitingForOperand = false;
+      updateCalcDisplay();
+    }
+
+    function performOperation(left, operator, right) {
+      const l = parseFloat(left);
+      const r = parseFloat(right);
+      if (isNaN(l) || isNaN(r)) return right;
+      switch (operator) {
+        case 'add': return (l + r).toString();
+        case 'subtract': return (l - r).toString();
+        case 'multiply': return (l * r).toString();
+        case 'divide': return r === 0 ? 'Error' : (l / r).toString();
+        case 'percent': return (l * r / 100).toString();
+        default: return right;
+      }
+    }
+
+    function inputDigit(digit) {
+      if (waitingForOperand) {
+        currentInput = digit;
+        waitingForOperand = false;
+      } else {
+        if (currentInput === '0' && digit !== '.') {
+          currentInput = digit;
         } else {
-            statusDiv.textContent = 'Browser does not support geolocation';
+          currentInput += digit;
         }
+      }
+      updateCalcDisplay();
+    }
 
-        // 3. Query Overpass API
-        function fetchRestaurants(lat, lon, radius) {
-            // Overpass QL: query restaurants and fast_food
-            const query = `
-                [out:json][timeout:25];
-                (
-                  node["amenity"="restaurant"](around:${radius},${lat},${lon});
-                  way["amenity"="restaurant"](around:${radius},${lat},${lon});
-                  node["amenity"="fast_food"](around:${radius},${lat},${lon});
-                  way["amenity"="fast_food"](around:${radius},${lat},${lon});
-                );
-                out body;
-                >;
-                out skel qt;
-            `;
-            
-            const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);
-            
-            fetch(url)
-                .then(response => response.json())
-                .then(data => {
-                    statusDiv.textContent = `Found ${data.elements.length} restaurants`;
-                    displayRestaurants(data.elements, lat, lon);
-                })
-                .catch(error => {
-                    statusDiv.textContent = 'Query failed: ' + error.message;
-                    console.error(error);
-                });
+    function inputDecimal() {
+      if (waitingForOperand) {
+        currentInput = '0.';
+        waitingForOperand = false;
+      } else if (!currentInput.includes('.')) {
+        currentInput += '.';
+      }
+      updateCalcDisplay();
+    }
+
+    function backspace() {
+      if (waitingForOperand) {
+        currentInput = '0';
+        waitingForOperand = false;
+      } else {
+        if (currentInput.length === 1 || (currentInput.length === 2 && currentInput.startsWith('-'))) {
+          currentInput = '0';
+        } else {
+          currentInput = currentInput.slice(0, -1);
         }
+      }
+      updateCalcDisplay();
+    }
 
-        // 4. Display on map
-        function displayRestaurants(elements, userLat, userLon) {
-            elements.forEach(el => {
-                // Overpass returns node and way, ways need center
-                let lat, lon;
-                if (el.type === 'node') {
-                    lat = el.lat;
-                    lon = el.lon;
-                } else if (el.type === 'way' && el.center) {
-                    lat = el.center.lat;
-                    lon = el.center.lon;
-                } else {
-                    return; // Skip if no coordinates
-                }
-
-                const tags = el.tags || {};
-                const name = tags.name || 'Unnamed Restaurant';
-                const cuisine = tags.cuisine || '';
-                const address = tags['addr:street'] 
-                    ? `${tags['addr:housenumber'] || ''} ${tags['addr:street']}`.trim()
-                    : 'Address not recorded';
-                const phone = tags.phone || tags['contact:phone'] || '';
-                const website = tags.website || tags['contact:website'] || '';
-                const openingHours = tags.opening_hours || '';
-
-                // Calculate distance (Haversine simplified)
-                const dist = getDistance(userLat, userLon, lat, lon);
-
-                // Build popup content
-                let popupHtml = `<div class="restaurant-info">
-                    <h4>${escapeHtml(name)}</h4>
-                    <p>📏 ${dist.toFixed(0)} meters away</p>
-                    <p>📍 ${escapeHtml(address)}</p>`;
-                
-                if (cuisine) popupHtml += `<span class="cuisine-tag">${escapeHtml(cuisine)}</span>`;
-                if (phone) popupHtml += `<p>📞 ${escapeHtml(phone)}</p>`;
-                if (openingHours) popupHtml += `<p>🕒 ${escapeHtml(openingHours)}</p>`;
-                if (website) popupHtml += `<p><a href="${escapeHtml(website)}" target="_blank">Website</a></p>`;
-                
-                popupHtml += `</div>`;
-
-                // Add marker
-                L.marker([lat, lon])
-                    .addTo(map)
-                    .bindPopup(popupHtml);
-            });
+    function handleOperator(op) {
+      const inputValue = parseFloat(currentInput);
+      if (pendingOperator && !waitingForOperand && leftOperand !== null) {
+        const result = performOperation(leftOperand, pendingOperator, inputValue);
+        if (result === 'Error') {
+          calcDisplay.textContent = 'Error';
+          currentInput = '0';
+          leftOperand = null;
+          pendingOperator = null;
+          waitingForOperand = false;
+          return;
         }
+        currentInput = result;
+        leftOperand = parseFloat(result);
+        updateCalcDisplay();
+      } else {
+        leftOperand = inputValue;
+      }
+      waitingForOperand = true;
+      pendingOperator = op;
+    }
 
-        // Haversine distance (meters)
-        function getDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371000;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return R * c;
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-    </script>
-</body>
-</html>
+    function handleEquals() {
+      if (!pendingOperator) {
+        updateCalcDisplay();
+        return;
+      }
+      const inputValue = parseFloat(currentInput);
+      if (leftOperand === null) leftOperand = inputValue;
+      const result = performOperation(leftOperand, pendingOperator, inputValue);
+      if (result === 'Error') {
+        calcDisplay.textContent = 'Error';
+        currentInput =
