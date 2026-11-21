@@ -1,564 +1,157 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>BTC Multi-Timeframe Signal Dashboard</title>
-<style>
-  :root {
-    --bg: #0d1117;
-    --card: #161b22;
-    --border: #30363d;
-    --text: #e6edf3;
-    --muted: #8b949e;
-    --green: #3fb950;
-    --red: #f85149;
-    --yellow: #d29922;
-    --blue: #58a6ff;
-    --purple: #bc8cff;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    padding: 20px;
-  }
-  .container { max-width: 900px; margin: 0 auto; }
-  header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  h1 { font-size: 22px; margin: 0; }
-  .meta { color: var(--muted); font-size: 13px; }
-  .card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 20px;
-    margin-bottom: 16px;
-  }
-  .signal-box {
-    text-align: center;
-    padding: 30px 20px;
-    border-radius: 10px;
-    margin-bottom: 16px;
-    transition: background 0.3s;
-  }
-  .signal-LONG  { background: rgba(63,185,80,0.15); border: 1px solid var(--green); }
-  .signal-SHORT { background: rgba(248,81,73,0.15); border: 1px solid var(--red); }
-  .signal-NEUTRAL { background: rgba(210,153,34,0.15); border: 1px solid var(--yellow); }
-  .signal-label { font-size: 36px; font-weight: 700; margin: 0; letter-spacing: 2px; }
-  .signal-LONG .signal-label { color: var(--green); }
-  .signal-SHORT .signal-label { color: var(--red); }
-  .signal-NEUTRAL .signal-label { color: var(--yellow); }
-  .signal-reason { color: var(--muted); font-size: 13px; margin-top: 8px; }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 12px;
-  }
-  .stat {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px;
-  }
-  .stat-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
-  .stat-value { font-size: 18px; font-weight: 600; margin-top: 4px; font-family: "SF Mono", Consolas, monospace; }
-  .levels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
-  .level { padding: 14px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); }
-  .level-label { font-size: 11px; color: var(--muted); text-transform: uppercase; }
-  .level-value { font-size: 20px; font-weight: 600; margin-top: 4px; font-family: "SF Mono", Consolas, monospace; }
-  .level.stop .level-value { color: var(--red); }
-  .level.target .level-value { color: var(--green); }
-  button {
-    background: var(--blue);
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 600;
-  }
-  button:hover { opacity: 0.9; }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .error { color: var(--red); font-size: 13px; margin-top: 10px; }
-  .footer { color: var(--muted); font-size: 12px; text-align: center; margin-top: 20px; }
-  .status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-  .status.on { background: var(--green); }
-  .status.off { background: var(--red); }
-</style>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nearby Restaurants (OSM)</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 0; font-family: sans-serif; }
+        #map { height: 100vh; width: 100%; }
+        #status { position: absolute; top: 10px; left: 50px; z-index: 1000; background: white; padding: 8px 15px; border-radius: 4px; box-shadow: 0 1px 5px rgba(0,0,0,0.3); }
+        .restaurant-info { max-width: 250px; }
+        .restaurant-info h4 { margin: 0 0 5px 0; color: #333; }
+        .restaurant-info p { margin: 3px 0; font-size: 13px; color: #666; }
+        .cuisine-tag { display: inline-block; background: #e8f5e9; color: #2e7d32; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-top: 5px; }
+    </style>
 </head>
 <body>
-<div class="container">
-  <header>
-    <div>
-      <h1>₿ BTC Multi-Timeframe Signal</h1>
-      <div class="meta"><span id="status" class="status off"></span><span id="statusText">Waiting...</span></div>
-    </div>
-    <button id="refresh" onclick="refresh()">Refresh</button>
-  </header>
+    <div id="status">Getting your location...</div>
+    <div id="map"></div>
 
-  <div id="signalBox" class="signal-box signal-NEUTRAL">
-    <p class="signal-label" id="signalLabel">LOADING</p>
-    <p class="signal-reason" id="signalReason">Fetching data from Binance...</p>
-  </div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map').setView([0, 0], 2);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(map);
 
-  <!-- MAIN STRATEGY PANEL -->
-  <div class="card">
-    <div class="stat-label" style="margin-bottom:12px;">Main Strategy (1D Trend + 4H Entry)</div>
-    <div class="grid">
-      <div class="stat"><div class="stat-label">Price</div><div class="stat-value" id="price">—</div></div>
-      <div class="stat"><div class="stat-label">ATR (14) 4H</div><div class="stat-value" id="atr">—</div></div>
-      <div class="stat"><div class="stat-label">RSI (14) 4H</div><div class="stat-value" id="rsi">—</div></div>
-      <div class="stat"><div class="stat-label">1D Trend</div><div class="stat-value" id="trend">—</div></div>
-    </div>
-    <div class="levels" id="levels" style="display:none;">
-      <div class="level stop"><div class="level-label">Stop Loss (1.5× ATR)</div><div class="level-value" id="stop">—</div></div>
-      <div class="level target"><div class="level-label">Take Profit (3× ATR)</div><div class="level-value" id="target">—</div></div>
-    </div>
-  </div>
+        const statusDiv = document.getElementById('status');
 
-  <!-- TRADINGVIEW INDICATORS PANEL -->
-  <div class="card" style="border-color: var(--purple);">
-    <div class="stat-label" style="margin-bottom:12px; color: var(--purple);">📊 TradingView Indicators (4H)</div>
-    <div class="grid">
-      <!-- Follow Line -->
-      <div class="stat">
-        <div class="stat-label">Follow Line Trend</div>
-        <div class="stat-value" id="fl-trend" style="font-size:16px;">—</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Follow Line Value</div>
-        <div class="stat-value" id="fl-value">—</div>
-      </div>
-      <!-- Chandelier Exit -->
-      <div class="stat">
-        <div class="stat-label">Chandelier Long Stop</div>
-        <div class="stat-value" id="ce-long" style="color: var(--green);">—</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Chandelier Short Stop</div>
-        <div class="stat-value" id="ce-short" style="color: var(--red);">—</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- DETAIL PANEL -->
-  <div class="card">
-    <div class="stat-label" style="margin-bottom:8px;">Indicator Detail</div>
-    <div class="grid">
-      <div class="stat"><div class="stat-label">4H EMA 20</div><div class="stat-value" id="ema4h20">—</div></div>
-      <div class="stat"><div class="stat-label">4H EMA 50</div><div class="stat-value" id="ema4h50">—</div></div>
-      <div class="stat"><div class="stat-label">4H MACD</div><div class="stat-value" id="macd4h">—</div></div>
-      <div class="stat"><div class="stat-label">1D EMA 20</div><div class="stat-value" id="ema2d20">—</div></div>
-      <div class="stat"><div class="stat-label">1D EMA 50</div><div class="stat-value" id="ema2d50">—</div></div>
-      <div class="stat"><div class="stat-label">Last Update</div><div class="stat-value" id="updated" style="font-size:13px;">—</div></div>
-    </div>
-  </div>
-
-  <div class="footer">Educational only. Not financial advice. Auto-refresh every 5 min.</div>
-</div>
-
-<script>
-// ============ CONFIG ============
-const CONFIG = {
-  symbol: "BTCUSDT",
-  apiBase: "https://api.binance.com", 
-  trendTF: "1d",   
-  entryTF: "4h",
-  trendLimit: 120,
-  entryLimit: 300,
-  emaFast: 20,
-  emaSlow: 50,
-  rsiLen: 14,
-  atrLen: 14,
-  macdFast: 12, macdSlow: 26, macdSignal: 9,
-  rsiLongMax: 70,
-  rsiShortMin: 30,
-  slMult: 1.5,
-  tpMult: 3.0,
-  autoRefreshMs: 5 * 60 * 1000,
-  // Follow Line Params
-  bbPeriod: 21,
-  bbDev: 1.0,
-  atrPeriodFL: 5,
-  // Chandelier Exit Params
-  atrPeriodCE: 22,
-  atrMultCE: 3.0,
-};
-
-// ============ DATA FETCH ============
-async function fetchKlines(tf, limit) {
-  const url = `${CONFIG.apiBase}/api/v3/klines?symbol=${CONFIG.symbol}&interval=${tf}&limit=${limit}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
-  const raw = await res.json();
-  return raw.map(k => ({
-    time: k[0],
-    open: parseFloat(k[1]),
-    high: parseFloat(k[2]),
-    low: parseFloat(k[3]),
-    close: parseFloat(k[4]),
-    volume: parseFloat(k[5]),
-  }));
-}
-
-// ============ BASIC INDICATORS ============
-function ema(values, length) {
-  const k = 2 / (length + 1);
-  const out = new Array(values.length).fill(null);
-  if (values.length < length) return out;
-  let sum = 0;
-  for (let i = 0; i < length; i++) sum += values[i];
-  let prev = sum / length;
-  out[length - 1] = prev;
-  for (let i = length; i < values.length; i++) {
-    prev = values[i] * k + prev * (1 - k);
-    out[i] = prev;
-  }
-  return out;
-}
-
-function sma(values, length) {
-    const out = new Array(values.length).fill(null);
-    if (values.length < length) return out;
-    let sum = 0;
-    for (let i = 0; i < length; i++) sum += values[i];
-    out[length - 1] = sum / length;
-    for (let i = length; i < values.length; i++) {
-        sum = sum - values[i - length] + values[i];
-        out[i] = sum / length;
-    }
-    return out;
-}
-
-function stdev(values, length) {
-    const out = new Array(values.length).fill(null);
-    const mean = sma(values, length);
-    if (values.length < length) return out;
-    for (let i = length - 1; i < values.length; i++) {
-        let sumSq = 0;
-        for (let j = i - length + 1; j <= i; j++) {
-            sumSq += Math.pow(values[j] - mean[i], 2);
-        }
-        out[i] = Math.sqrt(sumSq / length);
-    }
-    return out;
-}
-
-function rsi(values, length) {
-  const out = new Array(values.length).fill(null);
-  if (values.length < length + 1) return out;
-  let gains = 0, losses = 0;
-  for (let i = 1; i <= length; i++) {
-    const diff = values[i] - values[i - 1];
-    if (diff >= 0) gains += diff; else losses -= diff;
-  }
-  let avgGain = gains / length;
-  let avgLoss = losses / length;
-  out[length] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
-  for (let i = length + 1; i < values.length; i++) {
-    const diff = values[i] - values[i - 1];
-    const gain = diff > 0 ? diff : 0;
-    const loss = diff < 0 ? -diff : 0;
-    avgGain = (avgGain * (length - 1) + gain) / length;
-    avgLoss = (avgLoss * (length - 1) + loss) / length;
-    out[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
-  }
-  return out;
-}
-
-function atr(highs, lows, closes, length) {
-  const trs = new Array(closes.length).fill(null);
-  for (let i = 1; i < closes.length; i++) {
-    trs[i] = Math.max(
-      highs[i] - lows[i],
-      Math.abs(highs[i] - closes[i - 1]),
-      Math.abs(lows[i] - closes[i - 1])
-    );
-  }
-  const out = new Array(closes.length).fill(null);
-  if (closes.length < length + 1) return out;
-  let sum = 0;
-  for (let i = 1; i <= length; i++) sum += trs[i];
-  let prev = sum / length;
-  out[length] = prev;
-  for (let i = length + 1; i < closes.length; i++) {
-    prev = (prev * (length - 1) + trs[i]) / length;
-    out[i] = prev;
-  }
-  return out;
-}
-
-function macd(values, fast, slow, signal) {
-  const emaFast = ema(values, fast);
-  const emaSlow = ema(values, slow);
-  const macdLine = values.map((_, i) =>
-    emaFast[i] !== null && emaSlow[i] !== null ? emaFast[i] - emaSlow[i] : null
-  );
-  const validMacd = macdLine.filter(v => v !== null);
-  const signalArr = ema(validMacd, signal);
-  const signalLine = new Array(values.length).fill(null);
-  let idx = 0;
-  for (let i = 0; i < macdLine.length; i++) {
-    if (macdLine[i] !== null) {
-      signalLine[i] = signalArr[idx] ?? null;
-      idx++;
-    }
-  }
-  return { macdLine, signalLine };
-}
-
-// ============ FOLLOW LINE (TradingView Logic) ============
-function calculateFollowLine(klines, bbPeriod, bbDev, atrPeriod) {
-    const closes = klines.map(k => k.close);
-    const highs = klines.map(k => k.high);
-    const lows = klines.map(k => k.low);
-    
-    const bbMid = sma(closes, bbPeriod);
-    const bbStd = stdev(closes, bbPeriod);
-    const bbUpper = bbMid.map((m, i) => m !== null ? m + bbStd[i] * bbDev : null);
-    const bbLower = bbMid.map((m, i) => m !== null ? m - bbStd[i] * bbDev : null);
-    const atrFL = atr(highs, lows, closes, atrPeriod);
-
-    let trendLine = new Array(closes.length).fill(null);
-    let trendDir = 0;
-
-    for (let i = bbPeriod; i < closes.length; i++) {
-        let signal = 0;
-        if (closes[i] > bbUpper[i]) signal = 1;
-        else if (closes[i] < bbLower[i]) signal = -1;
-
-        let tempLine = null;
-        if (signal === 1) {
-            tempLine = lows[i] - (atrFL[i] !== null ? atrFL[i] : 0);
-            trendLine[i] = trendLine[i-1] !== null ? Math.max(tempLine, trendLine[i-1]) : tempLine;
-        } else if (signal === -1) {
-            tempLine = highs[i] + (atrFL[i] !== null ? atrFL[i] : 0);
-            trendLine[i] = trendLine[i-1] !== null ? Math.min(tempLine, trendLine[i-1]) : tempLine;
+        // 1. Get user location
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    
+                    map.setView([lat, lon], 15);
+                    statusDiv.textContent = 'Searching for restaurants nearby...';
+                    
+                    // Add user location marker
+                    L.circleMarker([lat, lon], {
+                        radius: 8, fillColor: '#4285F4', color: '#fff', weight: 2, fillOpacity: 1
+                    }).addTo(map).bindPopup('You are here');
+                    
+                    // 2. Query Overpass API for restaurants within 1km
+                    fetchRestaurants(lat, lon, 1000);
+                },
+                (error) => {
+                    statusDiv.textContent = 'Location failed: ' + error.message + '. Showing default view.';
+                    map.setView([40.7128, -74.0060], 13); // Default New York
+                }
+            );
         } else {
-            trendLine[i] = trendLine[i-1];
+            statusDiv.textContent = 'Browser does not support geolocation';
         }
 
-        // Determine trend direction
-        if (trendLine[i] !== null && trendLine[i-1] !== null) {
-            if (trendLine[i] > trendLine[i-1]) trendDir = 1;
-            else if (trendLine[i] < trendLine[i-1]) trendDir = -1;
+        // 3. Query Overpass API
+        function fetchRestaurants(lat, lon, radius) {
+            // Overpass QL: query restaurants and fast_food
+            const query = `
+                [out:json][timeout:25];
+                (
+                  node["amenity"="restaurant"](around:${radius},${lat},${lon});
+                  way["amenity"="restaurant"](around:${radius},${lat},${lon});
+                  node["amenity"="fast_food"](around:${radius},${lat},${lon});
+                  way["amenity"="fast_food"](around:${radius},${lat},${lon});
+                );
+                out body;
+                >;
+                out skel qt;
+            `;
+            
+            const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    statusDiv.textContent = `Found ${data.elements.length} restaurants`;
+                    displayRestaurants(data.elements, lat, lon);
+                })
+                .catch(error => {
+                    statusDiv.textContent = 'Query failed: ' + error.message;
+                    console.error(error);
+                });
         }
-    }
-    return { trendLine: trendLine[trendLine.length - 2], trendDir }; // use closed candle
-}
 
-// ============ CHANDELIER EXIT ============
-function calculateChandelierExit(klines, atrPeriod, mult) {
-    const highs = klines.map(k => k.high);
-    const lows = klines.map(k => k.low);
-    const closes = klines.map(k => k.close);
-    
-    const atrCE = atr(highs, lows, closes, atrPeriod);
-    
-    // Calculate Highest High and Lowest Low over atrPeriod
-    const hh = new Array(closes.length).fill(null);
-    const ll = new Array(closes.length).fill(null);
-    
-    for (let i = atrPeriod - 1; i < closes.length; i++) {
-        let maxH = -Infinity;
-        let minL = Infinity;
-        for (let j = i - atrPeriod + 1; j <= i; j++) {
-            if (highs[j] > maxH) maxH = highs[j];
-            if (lows[j] < minL) minL = lows[j];
+        // 4. Display on map
+        function displayRestaurants(elements, userLat, userLon) {
+            elements.forEach(el => {
+                // Overpass returns node and way, ways need center
+                let lat, lon;
+                if (el.type === 'node') {
+                    lat = el.lat;
+                    lon = el.lon;
+                } else if (el.type === 'way' && el.center) {
+                    lat = el.center.lat;
+                    lon = el.center.lon;
+                } else {
+                    return; // Skip if no coordinates
+                }
+
+                const tags = el.tags || {};
+                const name = tags.name || 'Unnamed Restaurant';
+                const cuisine = tags.cuisine || '';
+                const address = tags['addr:street'] 
+                    ? `${tags['addr:housenumber'] || ''} ${tags['addr:street']}`.trim()
+                    : 'Address not recorded';
+                const phone = tags.phone || tags['contact:phone'] || '';
+                const website = tags.website || tags['contact:website'] || '';
+                const openingHours = tags.opening_hours || '';
+
+                // Calculate distance (Haversine simplified)
+                const dist = getDistance(userLat, userLon, lat, lon);
+
+                // Build popup content
+                let popupHtml = `<div class="restaurant-info">
+                    <h4>${escapeHtml(name)}</h4>
+                    <p>📏 ${dist.toFixed(0)} meters away</p>
+                    <p>📍 ${escapeHtml(address)}</p>`;
+                
+                if (cuisine) popupHtml += `<span class="cuisine-tag">${escapeHtml(cuisine)}</span>`;
+                if (phone) popupHtml += `<p>📞 ${escapeHtml(phone)}</p>`;
+                if (openingHours) popupHtml += `<p>🕒 ${escapeHtml(openingHours)}</p>`;
+                if (website) popupHtml += `<p><a href="${escapeHtml(website)}" target="_blank">Website</a></p>`;
+                
+                popupHtml += `</div>`;
+
+                // Add marker
+                L.marker([lat, lon])
+                    .addTo(map)
+                    .bindPopup(popupHtml);
+            });
         }
-        hh[i] = maxH;
-        ll[i] = minL;
-    }
 
-    const i = closes.length - 2; // closed candle
-    const longStop = hh[i] - atrCE[i] * mult;
-    const shortStop = ll[i] + atrCE[i] * mult;
-    
-    return { longStop, shortStop };
-}
+        // Haversine distance (meters)
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
 
-// ============ MAIN ANALYSIS ============
-function analyze(entry, trend) {
-  const closesE = entry.map(c => c.close);
-  const closesT = trend.map(c => c.close);
-
-  const emaFastE = ema(closesE, CONFIG.emaFast);
-  const emaSlowE = ema(closesE, CONFIG.emaSlow);
-  const rsiE = rsi(closesE, CONFIG.rsiLen);
-  const atrE = atr(entry.map(c => c.high), entry.map(c => c.low), closesE, CONFIG.atrLen);
-  const macdE = macd(closesE, CONFIG.macdFast, CONFIG.macdSlow, CONFIG.macdSignal);
-
-  const emaFastT = ema(closesT, CONFIG.emaFast);
-  const emaSlowT = ema(closesT, CONFIG.emaSlow);
-
-  const iE = entry.length - 2;
-  const iT = trend.length - 2;
-
-  const price = entry[iE].close;
-  const atrVal = atrE[iE];
-  const rsiVal = rsiE[iE];
-  const macdLineVal = macdE.macdLine[iE];
-  const macdSigVal = macdE.signalLine[iE];
-
-  const trendFast = emaFastT[iT];
-  const trendSlow = emaSlowT[iT];
-
-  const trendBull = trendFast > trendSlow;
-  const trendBear = trendFast < trendSlow;
-  const macdBull = macdLineVal > macdSigVal;
-  const macdBear = macdLineVal < macdSigVal;
-
-  let signal = "NEUTRAL";
-  let reason = "No confluence";
-
-  if (trendBull && macdBull && rsiVal < CONFIG.rsiLongMax) {
-    signal = "LONG";
-    reason = `1D uptrend + 4H MACD bull + RSI ${rsiVal.toFixed(1)} < ${CONFIG.rsiLongMax}`;
-  } else if (trendBear && macdBear && rsiVal > CONFIG.rsiShortMin) {
-    signal = "SHORT";
-    reason = `1D downtrend + 4H MACD bear + RSI ${rsiVal.toFixed(1)} > ${CONFIG.rsiShortMin}`;
-  } else if (trendBull && !macdBull) {
-    reason = "1D bullish but 4H momentum bearish (wait)";
-  } else if (trendBear && !macdBear) {
-    reason = "1D bearish but 4H momentum bullish (wait)";
-  } else if (trendBull && rsiVal >= CONFIG.rsiLongMax) {
-    reason = "1D bullish but 4H RSI overbought (wait)";
-  } else if (trendBear && rsiVal <= CONFIG.rsiShortMin) {
-    reason = "1D bearish but 4H RSI oversold (wait)";
-  }
-
-  let stop = null, target = null;
-  if (signal === "LONG") {
-    stop = price - CONFIG.slMult * atrVal;
-    target = price + CONFIG.tpMult * atrVal;
-  } else if (signal === "SHORT") {
-    stop = price + CONFIG.slMult * atrVal;
-    target = price - CONFIG.tpMult * atrVal;
-  }
-
-  // TV Indicators
-  const fl = calculateFollowLine(entry, CONFIG.bbPeriod, CONFIG.bbDev, CONFIG.atrPeriodFL);
-  const ce = calculateChandelierExit(entry, CONFIG.atrPeriodCE, CONFIG.atrMultCE);
-
-  return {
-    signal, reason, price, atr: atrVal, rsi: rsiVal,
-    ema4h20: emaFastE[iE], ema4h50: emaSlowE[iE],
-    macd4h: macdLineVal - macdSigVal,
-    ema2d20: trendFast, ema2d50: trendSlow,
-    stop, target,
-    flTrend: fl.trendDir, flValue: fl.trendLine,
-    ceLong: ce.longStop, ceShort: ce.shortStop
-  };
-}
-
-// ============ UI ============
-const fmt = (v) => v === null || v === undefined || isNaN(v) ? "—" :
-  "$" + v.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 });
-
-function render(r) {
-  const box = document.getElementById("signalBox");
-  box.className = "signal-box signal-" + r.signal;
-  document.getElementById("signalLabel").textContent = r.signal;
-  document.getElementById("signalReason").textContent = r.reason;
-
-  document.getElementById("price").textContent = fmt(r.price);
-  document.getElementById("atr").textContent = fmt(r.atr);
-  document.getElementById("rsi").textContent = r.rsi.toFixed(2);
-
-  const trendEl = document.getElementById("trend");
-  if (r.ema2d20 > r.ema2d50) {
-    trendEl.textContent = "BULLISH";
-    trendEl.style.color = "var(--green)";
-  } else {
-    trendEl.textContent = "BEARISH";
-    trendEl.style.color = "var(--red)";
-  }
-
-  document.getElementById("ema4h20").textContent = fmt(r.ema4h20);
-  document.getElementById("ema4h50").textContent = fmt(r.ema4h50);
-
-  const macdEl = document.getElementById("macd4h");
-  macdEl.textContent = r.macd4h.toFixed(2);
-  macdEl.style.color = r.macd4h >= 0 ? "var(--green)" : "var(--red)";
-
-  document.getElementById("ema2d20").textContent = fmt(r.ema2d20);
-  document.getElementById("ema2d50").textContent = fmt(r.ema2d50);
-
-  // TV Indicators
-  const flTrendEl = document.getElementById("fl-trend");
-  if (r.flTrend === 1) {
-      flTrendEl.textContent = "UP (Bullish)";
-      flTrendEl.style.color = "var(--green)";
-  } else if (r.flTrend === -1) {
-      flTrendEl.textContent = "DOWN (Bearish)";
-      flTrendEl.style.color = "var(--red)";
-  } else {
-      flTrendEl.textContent = "NEUTRAL";
-      flTrendEl.style.color = "var(--yellow)";
-  }
-  document.getElementById("fl-value").textContent = fmt(r.flValue);
-  
-  document.getElementById("ce-long").textContent = fmt(r.ceLong);
-  document.getElementById("ce-short").textContent = fmt(r.ceShort);
-
-  const levels = document.getElementById("levels");
-  if (r.stop !== null && r.target !== null) {
-    levels.style.display = "grid";
-    document.getElementById("stop").textContent = fmt(r.stop);
-    document.getElementById("target").textContent = fmt(r.target);
-  } else {
-    levels.style.display = "none";
-  }
-
-  document.getElementById("updated").textContent = new Date().toLocaleTimeString();
-}
-
-function setStatus(ok, msg) {
-  const el = document.getElementById("status");
-  el.className = "status " + (ok ? "on" : "off");
-  document.getElementById("statusText").textContent = msg;
-}
-
-// ============ MAIN ============
-async function refresh() {
-  const btn = document.getElementById("refresh");
-  btn.disabled = true;
-  document.getElementById("error").textContent = "";
-  setStatus(false, "Fetching...");
-  try {
-    const [entry, trend] = await Promise.all([
-      fetchKlines(CONFIG.entryTF, CONFIG.entryLimit),
-      fetchKlines(CONFIG.trendTF, CONFIG.trendLimit),
-    ]);
-    if (entry.length < 60 || trend.length < 60) {
-      throw new Error("Not enough candles returned");
-    }
-    const result = analyze(entry, trend);
-    render(result);
-    setStatus(true, "Live • auto-refresh every 5 min");
-  } catch (err) {
-    console.error(err);
-    document.getElementById("error").textContent =
-      "Error: " + err.message +
-      " — If Binance is blocked in your region, try a VPN or swap apiBase to a mirror (e.g. https://api.binance.us for US users).";
-    setStatus(false, "Error");
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-refresh();
-setInterval(refresh, CONFIG.autoRefreshMs);
-</script>
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
 </body>
-  </html>
+</html>
