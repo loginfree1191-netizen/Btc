@@ -15,6 +15,7 @@
     --red: #f85149;
     --yellow: #d29922;
     --blue: #58a6ff;
+    --purple: #bc8cff;
   }
   * { box-sizing: border-box; }
   body {
@@ -110,22 +111,47 @@
     <p class="signal-reason" id="signalReason">Fetching data from Binance...</p>
   </div>
 
+  <!-- MAIN STRATEGY PANEL -->
   <div class="card">
+    <div class="stat-label" style="margin-bottom:12px;">Main Strategy (1D Trend + 4H Entry)</div>
     <div class="grid">
       <div class="stat"><div class="stat-label">Price</div><div class="stat-value" id="price">—</div></div>
       <div class="stat"><div class="stat-label">ATR (14) 4H</div><div class="stat-value" id="atr">—</div></div>
       <div class="stat"><div class="stat-label">RSI (14) 4H</div><div class="stat-value" id="rsi">—</div></div>
       <div class="stat"><div class="stat-label">1D Trend</div><div class="stat-value" id="trend">—</div></div>
     </div>
-
     <div class="levels" id="levels" style="display:none;">
       <div class="level stop"><div class="level-label">Stop Loss (1.5× ATR)</div><div class="level-value" id="stop">—</div></div>
       <div class="level target"><div class="level-label">Take Profit (3× ATR)</div><div class="level-value" id="target">—</div></div>
     </div>
-
-    <div class="error" id="error"></div>
   </div>
 
+  <!-- TRADINGVIEW INDICATORS PANEL -->
+  <div class="card" style="border-color: var(--purple);">
+    <div class="stat-label" style="margin-bottom:12px; color: var(--purple);">📊 TradingView Indicators (4H)</div>
+    <div class="grid">
+      <!-- Follow Line -->
+      <div class="stat">
+        <div class="stat-label">Follow Line Trend</div>
+        <div class="stat-value" id="fl-trend" style="font-size:16px;">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Follow Line Value</div>
+        <div class="stat-value" id="fl-value">—</div>
+      </div>
+      <!-- Chandelier Exit -->
+      <div class="stat">
+        <div class="stat-label">Chandelier Long Stop</div>
+        <div class="stat-value" id="ce-long" style="color: var(--green);">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Chandelier Short Stop</div>
+        <div class="stat-value" id="ce-short" style="color: var(--red);">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DETAIL PANEL -->
   <div class="card">
     <div class="stat-label" style="margin-bottom:8px;">Indicator Detail</div>
     <div class="grid">
@@ -146,7 +172,7 @@
 const CONFIG = {
   symbol: "BTCUSDT",
   apiBase: "https://api.binance.com", 
-  trendTF: "1d",   // <--- CHANGED TO 1D HERE
+  trendTF: "1d",   
   entryTF: "4h",
   trendLimit: 120,
   entryLimit: 300,
@@ -160,6 +186,13 @@ const CONFIG = {
   slMult: 1.5,
   tpMult: 3.0,
   autoRefreshMs: 5 * 60 * 1000,
+  // Follow Line Params
+  bbPeriod: 21,
+  bbDev: 1.0,
+  atrPeriodFL: 5,
+  // Chandelier Exit Params
+  atrPeriodCE: 22,
+  atrMultCE: 3.0,
 };
 
 // ============ DATA FETCH ============
@@ -178,7 +211,7 @@ async function fetchKlines(tf, limit) {
   }));
 }
 
-// ============ INDICATORS ============
+// ============ BASIC INDICATORS ============
 function ema(values, length) {
   const k = 2 / (length + 1);
   const out = new Array(values.length).fill(null);
@@ -192,6 +225,33 @@ function ema(values, length) {
     out[i] = prev;
   }
   return out;
+}
+
+function sma(values, length) {
+    const out = new Array(values.length).fill(null);
+    if (values.length < length) return out;
+    let sum = 0;
+    for (let i = 0; i < length; i++) sum += values[i];
+    out[length - 1] = sum / length;
+    for (let i = length; i < values.length; i++) {
+        sum = sum - values[i - length] + values[i];
+        out[i] = sum / length;
+    }
+    return out;
+}
+
+function stdev(values, length) {
+    const out = new Array(values.length).fill(null);
+    const mean = sma(values, length);
+    if (values.length < length) return out;
+    for (let i = length - 1; i < values.length; i++) {
+        let sumSq = 0;
+        for (let j = i - length + 1; j <= i; j++) {
+            sumSq += Math.pow(values[j] - mean[i], 2);
+        }
+        out[i] = Math.sqrt(sumSq / length);
+    }
+    return out;
 }
 
 function rsi(values, length) {
@@ -257,7 +317,77 @@ function macd(values, fast, slow, signal) {
   return { macdLine, signalLine };
 }
 
-// ============ ANALYSIS ============
+// ============ FOLLOW LINE (TradingView Logic) ============
+function calculateFollowLine(klines, bbPeriod, bbDev, atrPeriod) {
+    const closes = klines.map(k => k.close);
+    const highs = klines.map(k => k.high);
+    const lows = klines.map(k => k.low);
+    
+    const bbMid = sma(closes, bbPeriod);
+    const bbStd = stdev(closes, bbPeriod);
+    const bbUpper = bbMid.map((m, i) => m !== null ? m + bbStd[i] * bbDev : null);
+    const bbLower = bbMid.map((m, i) => m !== null ? m - bbStd[i] * bbDev : null);
+    const atrFL = atr(highs, lows, closes, atrPeriod);
+
+    let trendLine = new Array(closes.length).fill(null);
+    let trendDir = 0;
+
+    for (let i = bbPeriod; i < closes.length; i++) {
+        let signal = 0;
+        if (closes[i] > bbUpper[i]) signal = 1;
+        else if (closes[i] < bbLower[i]) signal = -1;
+
+        let tempLine = null;
+        if (signal === 1) {
+            tempLine = lows[i] - (atrFL[i] !== null ? atrFL[i] : 0);
+            trendLine[i] = trendLine[i-1] !== null ? Math.max(tempLine, trendLine[i-1]) : tempLine;
+        } else if (signal === -1) {
+            tempLine = highs[i] + (atrFL[i] !== null ? atrFL[i] : 0);
+            trendLine[i] = trendLine[i-1] !== null ? Math.min(tempLine, trendLine[i-1]) : tempLine;
+        } else {
+            trendLine[i] = trendLine[i-1];
+        }
+
+        // Determine trend direction
+        if (trendLine[i] !== null && trendLine[i-1] !== null) {
+            if (trendLine[i] > trendLine[i-1]) trendDir = 1;
+            else if (trendLine[i] < trendLine[i-1]) trendDir = -1;
+        }
+    }
+    return { trendLine: trendLine[trendLine.length - 2], trendDir }; // use closed candle
+}
+
+// ============ CHANDELIER EXIT ============
+function calculateChandelierExit(klines, atrPeriod, mult) {
+    const highs = klines.map(k => k.high);
+    const lows = klines.map(k => k.low);
+    const closes = klines.map(k => k.close);
+    
+    const atrCE = atr(highs, lows, closes, atrPeriod);
+    
+    // Calculate Highest High and Lowest Low over atrPeriod
+    const hh = new Array(closes.length).fill(null);
+    const ll = new Array(closes.length).fill(null);
+    
+    for (let i = atrPeriod - 1; i < closes.length; i++) {
+        let maxH = -Infinity;
+        let minL = Infinity;
+        for (let j = i - atrPeriod + 1; j <= i; j++) {
+            if (highs[j] > maxH) maxH = highs[j];
+            if (lows[j] < minL) minL = lows[j];
+        }
+        hh[i] = maxH;
+        ll[i] = minL;
+    }
+
+    const i = closes.length - 2; // closed candle
+    const longStop = hh[i] - atrCE[i] * mult;
+    const shortStop = ll[i] + atrCE[i] * mult;
+    
+    return { longStop, shortStop };
+}
+
+// ============ MAIN ANALYSIS ============
 function analyze(entry, trend) {
   const closesE = entry.map(c => c.close);
   const closesT = trend.map(c => c.close);
@@ -271,7 +401,6 @@ function analyze(entry, trend) {
   const emaFastT = ema(closesT, CONFIG.emaFast);
   const emaSlowT = ema(closesT, CONFIG.emaSlow);
 
-  // Use last CLOSED candle (index length - 2)
   const iE = entry.length - 2;
   const iT = trend.length - 2;
 
@@ -317,12 +446,18 @@ function analyze(entry, trend) {
     target = price - CONFIG.tpMult * atrVal;
   }
 
+  // TV Indicators
+  const fl = calculateFollowLine(entry, CONFIG.bbPeriod, CONFIG.bbDev, CONFIG.atrPeriodFL);
+  const ce = calculateChandelierExit(entry, CONFIG.atrPeriodCE, CONFIG.atrMultCE);
+
   return {
     signal, reason, price, atr: atrVal, rsi: rsiVal,
     ema4h20: emaFastE[iE], ema4h50: emaSlowE[iE],
     macd4h: macdLineVal - macdSigVal,
-    ema2d20: trendFast, ema2d50: trendSlow, // 2d name kept internally, but uses 1d data
+    ema2d20: trendFast, ema2d50: trendSlow,
     stop, target,
+    flTrend: fl.trendDir, flValue: fl.trendLine,
+    ceLong: ce.longStop, ceShort: ce.shortStop
   };
 }
 
@@ -359,6 +494,23 @@ function render(r) {
   document.getElementById("ema2d20").textContent = fmt(r.ema2d20);
   document.getElementById("ema2d50").textContent = fmt(r.ema2d50);
 
+  // TV Indicators
+  const flTrendEl = document.getElementById("fl-trend");
+  if (r.flTrend === 1) {
+      flTrendEl.textContent = "UP (Bullish)";
+      flTrendEl.style.color = "var(--green)";
+  } else if (r.flTrend === -1) {
+      flTrendEl.textContent = "DOWN (Bearish)";
+      flTrendEl.style.color = "var(--red)";
+  } else {
+      flTrendEl.textContent = "NEUTRAL";
+      flTrendEl.style.color = "var(--yellow)";
+  }
+  document.getElementById("fl-value").textContent = fmt(r.flValue);
+  
+  document.getElementById("ce-long").textContent = fmt(r.ceLong);
+  document.getElementById("ce-short").textContent = fmt(r.ceShort);
+
   const levels = document.getElementById("levels");
   if (r.stop !== null && r.target !== null) {
     levels.style.display = "grid";
@@ -368,8 +520,7 @@ function render(r) {
     levels.style.display = "none";
   }
 
-  document.getElementById("updated").textContent =
-    new Date().toLocaleTimeString();
+  document.getElementById("updated").textContent = new Date().toLocaleTimeString();
 }
 
 function setStatus(ok, msg) {
