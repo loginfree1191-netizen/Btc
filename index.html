@@ -2,32 +2,35 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BTC Orderbook — Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BTC Orderbook — Live Binance</title>
 <style>
   :root{
     --bg:#0b0e11; --panel:#161a1e; --border:#2b3139;
     --green:#0ecb81; --red:#f6465d; --text:#eaecef; --muted:#848e9c;
   }
-  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
-  body{background:var(--bg);color:var(--text);display:flex;justify-content:center;padding:16px}
-  .wrap{width:100%;max-width:420px}
-  .header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
-  .title{font-size:20px;font-weight:700}
-  .price{font-size:22px;font-weight:700;color:var(--green)}
-  .sub{font-size:12px;color:var(--muted)}
-  .panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden}
-  .row{display:grid;grid-template-columns:1.2fr 1fr 1fr;padding:6px 10px;font-size:12px;position:relative}
-  .row.head{color:var(--muted);border-bottom:1px solid var(--border);font-size:11px}
-  .row .bar{position:absolute;top:0;bottom:0;right:0;opacity:.12;border-radius:2px}
-  .ask .bar{background:var(--red)}
-  .bid .bar{background:var(--green)}
-  .ask .p{color:var(--red)}
-  .bid .p{color:var(--green)}
-  .amt,.tot{text-align:right;color:var(--text)}
-  .mid{padding:8px 10px;text-align:center;font-weight:700;font-size:16px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:#1e2329}
-  .status{font-size:11px;color:var(--muted);text-align:center;margin-top:10px}
-  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:4px}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,Segoe UI,Roboto,sans-serif;}
+  body{background:var(--bg);color:var(--text);display:flex;justify-content:center;padding:12px;overflow:hidden;}
+  .wrap{width:100%;max-width:420px;display:flex;flex-direction:column;}
+  .header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;padding:0 4px;}
+  .title{font-size:20px;font-weight:700;}
+  .price{font-size:24px;font-weight:700;color:var(--green);transition: color 0.1s;}
+  .sub{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden;display:flex;flex-direction:column;height:75vh;}
+  .list{height:calc(50% - 20px); overflow:hidden; display:flex; flex-direction:column;}
+  #asks{justify-content:flex-end;}
+  .row{display:grid;grid-template-columns:1.2fr 1fr 1fr;padding:4px 10px;font-size:12px;position:relative;height:24px;align-items:center;}
+  .row.head{color:var(--muted);border-bottom:1px solid var(--border);font-size:10px;background:var(--panel);height:20px;}
+  .row .bar{position:absolute;top:0;bottom:0;right:0;opacity:.12;z-index:1;}
+  .ask .bar{background:var(--red);}
+  .bid .bar{background:var(--green);}
+  .row span{position:relative;z-index:2;}
+  .ask .p{color:var(--red);}
+  .bid .p{color:var(--green);}
+  .amt,.tot{text-align:right;color:var(--text);font-variant-numeric: tabular-nums;}
+  .mid{padding:6px 10px;text-align:center;font-weight:700;font-size:13px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:#1e2329;z-index:3;}
+  .status{font-size:10px;color:var(--muted);text-align:center;margin-top:8px;}
+  .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:4px;}
 </style>
 </head>
 <body>
@@ -35,72 +38,148 @@
   <div class="header">
     <div>
       <div class="title">BTC/USDT</div>
-      <div class="sub">Order Book · Demo</div>
+      <div class="sub">Binance Live · 100ms</div>
     </div>
-    <div class="price">$67,842.50</div>
+    <div class="price" id="livePrice">--</div>
   </div>
 
   <div class="panel">
     <div class="row head"><span>Price (USDT)</span><span class="amt">Amount (BTC)</span><span class="tot">Total</span></div>
-    <div id="asks"></div>
-    <div class="mid">Spread: 1.50</div>
-    <div id="bids"></div>
+    <div id="asks" class="list"></div>
+    <div class="mid" id="spread">Spread: --</div>
+    <div id="bids" class="list"></div>
   </div>
-  <div class="status"><span class="dot"></span>Demo data — not live</div>
+  <div class="status"><span class="dot"></span><span id="status">Connecting to Binance...</span></div>
 </div>
 
 <script>
-// ---------- DEMO DATA ----------
-const demoAsks = [
-  [67843.00, 0.0421],
-  [67844.50, 0.1183],
-  [67846.00, 0.2507],
-  [67848.20, 0.0894],
-  [67850.00, 0.6120],
-  [67852.10, 0.0315],
-  [67855.00, 0.4402],
-  [67858.30, 0.2076],
-];
-
-const demoBids = [
-  [67841.50, 0.0732],
-  [67840.00, 0.1845],
-  [67838.70, 0.3021],
-  [67836.00, 0.0568],
-  [67833.50, 0.5120],
-  [67830.00, 0.0973],
-  [67827.40, 0.3650],
-  [67824.00, 0.2219],
-];
-
+const ROWS_TO_SHOW = 10;
 const asksEl = document.getElementById('asks');
 const bidsEl = document.getElementById('bids');
+const livePrice = document.getElementById('livePrice');
+const spreadEl = document.getElementById('spread');
+const statusEl = document.getElementById('status');
 
-function fmt(n,d=2){return Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});}
+const fmt = (n,d=2) => Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
 
-function render(el, levels, side, maxTotal){
-  el.innerHTML='';
-  levels.forEach(([price, amt])=>{
-    const total = price*amt;
+// 构建固定行，后续只更新文本和条形宽度
+function buildRows(container, count) {
+  container.innerHTML = '';
+  const rows = [];
+  for(let i=0; i<count; i++){
     const row = document.createElement('div');
-    row.className = 'row '+side;
-    const pct = Math.min(100,(total/maxTotal)*100);
-    row.innerHTML = `
-      <span class="bar" style="width:${pct}%"></span>
-      <span class="p">${fmt(price)}</span>
-      <span class="amt">${Number(amt).toFixed(4)}</span>
-      <span class="tot">${fmt(total,0)}</span>`;
-    el.appendChild(row);
-  });
+    row.className = 'row';
+    row.innerHTML = `<span class="bar"></span><span class="p"></span><span class="amt"></span><span class="tot"></span>`;
+    container.appendChild(row);
+    rows.push({
+      el: row,
+      bar: row.querySelector('.bar'),
+      p: row.querySelector('.p'),
+      amt: row.querySelector('.amt'),
+      tot: row.querySelector('.tot')
+    });
+  }
+  return rows;
 }
 
-const maxTotal = Math.max(
-  ...demoAsks.map(([p,a])=>p*a),
-  ...demoBids.map(([p,a])=>p*a)
-);
+const askRows = buildRows(asksEl, ROWS_TO_SHOW);
+const bidRows = buildRows(bidsEl, ROWS_TO_SHOW);
 
-render(asksEl, demoAsks, 'ask', maxTotal);
-render(bidsEl, demoBids, 'bid', maxTotal);
+function updateBook(asks, bids) {
+  if(!asks || !bids || asks.length === 0 || bids.length === 0) return;
+
+  // Binance depth20 返回的已经是按价格排序好的数组
+  // asks: 价格从低到高，bids: 价格从高到低
+  const bestBid = parseFloat(bids[0][0]);
+  const bestAsk = parseFloat(asks[0][0]);
+
+  livePrice.textContent = '$' + fmt(bestBid);
+  spreadEl.textContent = 'Spread: ' + fmt(bestAsk - bestBid);
+
+  // 计算最大挂单量用于条形宽度
+  let maxTotal = 0;
+  for(let i=0; i<Math.min(ROWS_TO_SHOW, asks.length); i++) {
+    const p = parseFloat(asks[i][0]), a = parseFloat(asks[i][1]);
+    maxTotal = Math.max(maxTotal, p * a);
+  }
+  for(let i=0; i<Math.min(ROWS_TO_SHOW, bids.length); i++) {
+    const p = parseFloat(bids[i][0]), a = parseFloat(bids[i][1]);
+    maxTotal = Math.max(maxTotal, p * a);
+  }
+
+  // 填充卖单（asks），从上到下价格递增，最优卖价在最下面
+  for(let i=0; i<ROWS_TO_SHOW; i++) {
+    const row = askRows[i];
+    // asks 数组是低到高，我们要反向显示，让最低卖价在最靠近中间的位置
+    const data = asks[ROWS_TO_SHOW - 1 - i];
+    if(data) {
+      const p = parseFloat(data[0]), a = parseFloat(data[1]);
+      const total = p * a;
+      row.el.className = 'row ask';
+      row.p.textContent = fmt(p);
+      row.amt.textContent = a.toFixed(4);
+      row.tot.textContent = fmt(total, 0);
+      row.bar.style.width = Math.min(100, (total/maxTotal)*100) + '%';
+    } else {
+      row.el.className = 'row';
+      row.p.textContent = '';
+      row.amt.textContent = '';
+      row.tot.textContent = '';
+      row.bar.style.width = '0%';
+    }
+  }
+
+  // 填充买单（bids），最优买价在最上面
+  for(let i=0; i<ROWS_TO_SHOW; i++) {
+    const row = bidRows[i];
+    const data = bids[i];
+    if(data) {
+      const p = parseFloat(data[0]), a = parseFloat(data[1]);
+      const total = p * a;
+      row.el.className = 'row bid';
+      row.p.textContent = fmt(p);
+      row.amt.textContent = a.toFixed(4);
+      row.tot.textContent = fmt(total, 0);
+      row.bar.style.width = Math.min(100, (total/maxTotal)*100) + '%';
+    } else {
+      row.el.className = 'row';
+      row.p.textContent = '';
+      row.amt.textContent = '';
+      row.tot.textContent = '';
+      row.bar.style.width = '0%';
+    }
+  }
+}
+
+let ws;
+function connect() {
+  // Binance 公共现货数据流，无需 API Key
+  // depth20@100ms: 前20档快照，每100ms推送一次
+  ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@depth20@100ms');
+
+  ws.onopen = () => {
+    statusEl.textContent = 'Live (Binance · 100ms)';
+  };
+
+  ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    // depth20 流直接返回 { lastUpdateId, bids: [...], asks: [...] }
+    if(data.bids && data.asks) {
+      updateBook(data.asks, data.bids);
+    }
+  };
+
+  ws.onclose = () => {
+    statusEl.textContent = 'Reconnecting...';
+    setTimeout(connect, 2000);
+  };
+
+  ws.onerror = () => {
+    ws.close();
+  };
+}
+
+connect();
 </script>
 </body>
-  </html>
+</html>
