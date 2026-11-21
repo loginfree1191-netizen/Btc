@@ -115,7 +115,7 @@
       <div class="stat"><div class="stat-label">Price</div><div class="stat-value" id="price">—</div></div>
       <div class="stat"><div class="stat-label">ATR (14) 4H</div><div class="stat-value" id="atr">—</div></div>
       <div class="stat"><div class="stat-label">RSI (14) 4H</div><div class="stat-value" id="rsi">—</div></div>
-      <div class="stat"><div class="stat-label">2D Trend</div><div class="stat-value" id="trend">—</div></div>
+      <div class="stat"><div class="stat-label">1D Trend</div><div class="stat-value" id="trend">—</div></div>
     </div>
 
     <div class="levels" id="levels" style="display:none;">
@@ -132,8 +132,8 @@
       <div class="stat"><div class="stat-label">4H EMA 20</div><div class="stat-value" id="ema4h20">—</div></div>
       <div class="stat"><div class="stat-label">4H EMA 50</div><div class="stat-value" id="ema4h50">—</div></div>
       <div class="stat"><div class="stat-label">4H MACD</div><div class="stat-value" id="macd4h">—</div></div>
-      <div class="stat"><div class="stat-label">2D EMA 20</div><div class="stat-value" id="ema2d20">—</div></div>
-      <div class="stat"><div class="stat-label">2D EMA 50</div><div class="stat-value" id="ema2d50">—</div></div>
+      <div class="stat"><div class="stat-label">1D EMA 20</div><div class="stat-value" id="ema2d20">—</div></div>
+      <div class="stat"><div class="stat-label">1D EMA 50</div><div class="stat-value" id="ema2d50">—</div></div>
       <div class="stat"><div class="stat-label">Last Update</div><div class="stat-value" id="updated" style="font-size:13px;">—</div></div>
     </div>
   </div>
@@ -145,8 +145,8 @@
 // ============ CONFIG ============
 const CONFIG = {
   symbol: "BTCUSDT",
-  apiBase: "https://api.binance.com",
-  trendTF: "2d",
+  apiBase: "https://api.binance.com", 
+  trendTF: "1d",   // <--- CHANGED TO 1D HERE
   entryTF: "4h",
   trendLimit: 120,
   entryLimit: 300,
@@ -294,18 +294,18 @@ function analyze(entry, trend) {
 
   if (trendBull && macdBull && rsiVal < CONFIG.rsiLongMax) {
     signal = "LONG";
-    reason = `2D uptrend + 4H MACD bull + RSI ${rsiVal.toFixed(1)} < ${CONFIG.rsiLongMax}`;
+    reason = `1D uptrend + 4H MACD bull + RSI ${rsiVal.toFixed(1)} < ${CONFIG.rsiLongMax}`;
   } else if (trendBear && macdBear && rsiVal > CONFIG.rsiShortMin) {
     signal = "SHORT";
-    reason = `2D downtrend + 4H MACD bear + RSI ${rsiVal.toFixed(1)} > ${CONFIG.rsiShortMin}`;
+    reason = `1D downtrend + 4H MACD bear + RSI ${rsiVal.toFixed(1)} > ${CONFIG.rsiShortMin}`;
   } else if (trendBull && !macdBull) {
-    reason = "2D bullish but 4H momentum bearish (wait)";
+    reason = "1D bullish but 4H momentum bearish (wait)";
   } else if (trendBear && !macdBear) {
-    reason = "2D bearish but 4H momentum bullish (wait)";
+    reason = "1D bearish but 4H momentum bullish (wait)";
   } else if (trendBull && rsiVal >= CONFIG.rsiLongMax) {
-    reason = "2D bullish but 4H RSI overbought (wait)";
+    reason = "1D bullish but 4H RSI overbought (wait)";
   } else if (trendBear && rsiVal <= CONFIG.rsiShortMin) {
-    reason = "2D bearish but 4H RSI oversold (wait)";
+    reason = "1D bearish but 4H RSI oversold (wait)";
   }
 
   let stop = null, target = null;
@@ -321,7 +321,7 @@ function analyze(entry, trend) {
     signal, reason, price, atr: atrVal, rsi: rsiVal,
     ema4h20: emaFastE[iE], ema4h50: emaSlowE[iE],
     macd4h: macdLineVal - macdSigVal,
-    ema2d20: trendFast, ema2d50: trendSlow,
+    ema2d20: trendFast, ema2d50: trendSlow, // 2d name kept internally, but uses 1d data
     stop, target,
   };
 }
@@ -410,4 +410,4 @@ refresh();
 setInterval(refresh, CONFIG.autoRefreshMs);
 </script>
 </body>
-</html>
+  </html>
