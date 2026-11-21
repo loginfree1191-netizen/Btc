@@ -1,185 +1,413 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>BTC Orderbook — Live Binance</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BTC Multi-Timeframe Signal Dashboard</title>
 <style>
-  :root{
-    --bg:#0b0e11; --panel:#161a1e; --border:#2b3139;
-    --green:#0ecb81; --red:#f6465d; --text:#eaecef; --muted:#848e9c;
+  :root {
+    --bg: #0d1117;
+    --card: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d29922;
+    --blue: #58a6ff;
   }
-  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,Segoe UI,Roboto,sans-serif;}
-  body{background:var(--bg);color:var(--text);display:flex;justify-content:center;padding:12px;overflow:hidden;}
-  .wrap{width:100%;max-width:420px;display:flex;flex-direction:column;}
-  .header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;padding:0 4px;}
-  .title{font-size:20px;font-weight:700;}
-  .price{font-size:24px;font-weight:700;color:var(--green);transition: color 0.1s;}
-  .sub{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;}
-  .panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden;display:flex;flex-direction:column;height:75vh;}
-  .list{height:calc(50% - 20px); overflow:hidden; display:flex; flex-direction:column;}
-  #asks{justify-content:flex-end;}
-  .row{display:grid;grid-template-columns:1.2fr 1fr 1fr;padding:4px 10px;font-size:12px;position:relative;height:24px;align-items:center;}
-  .row.head{color:var(--muted);border-bottom:1px solid var(--border);font-size:10px;background:var(--panel);height:20px;}
-  .row .bar{position:absolute;top:0;bottom:0;right:0;opacity:.12;z-index:1;}
-  .ask .bar{background:var(--red);}
-  .bid .bar{background:var(--green);}
-  .row span{position:relative;z-index:2;}
-  .ask .p{color:var(--red);}
-  .bid .p{color:var(--green);}
-  .amt,.tot{text-align:right;color:var(--text);font-variant-numeric: tabular-nums;}
-  .mid{padding:6px 10px;text-align:center;font-weight:700;font-size:13px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:#1e2329;z-index:3;}
-  .status{font-size:10px;color:var(--muted);text-align:center;margin-top:8px;}
-  .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:4px;}
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 20px;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  h1 { font-size: 22px; margin: 0; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .signal-box {
+    text-align: center;
+    padding: 30px 20px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    transition: background 0.3s;
+  }
+  .signal-LONG  { background: rgba(63,185,80,0.15); border: 1px solid var(--green); }
+  .signal-SHORT { background: rgba(248,81,73,0.15); border: 1px solid var(--red); }
+  .signal-NEUTRAL { background: rgba(210,153,34,0.15); border: 1px solid var(--yellow); }
+  .signal-label { font-size: 36px; font-weight: 700; margin: 0; letter-spacing: 2px; }
+  .signal-LONG .signal-label { color: var(--green); }
+  .signal-SHORT .signal-label { color: var(--red); }
+  .signal-NEUTRAL .signal-label { color: var(--yellow); }
+  .signal-reason { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  .stat {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .stat-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+  .stat-value { font-size: 18px; font-weight: 600; margin-top: 4px; font-family: "SF Mono", Consolas, monospace; }
+  .levels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  .level { padding: 14px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); }
+  .level-label { font-size: 11px; color: var(--muted); text-transform: uppercase; }
+  .level-value { font-size: 20px; font-weight: 600; margin-top: 4px; font-family: "SF Mono", Consolas, monospace; }
+  .level.stop .level-value { color: var(--red); }
+  .level.target .level-value { color: var(--green); }
+  button {
+    background: var(--blue);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  button:hover { opacity: 0.9; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .error { color: var(--red); font-size: 13px; margin-top: 10px; }
+  .footer { color: var(--muted); font-size: 12px; text-align: center; margin-top: 20px; }
+  .status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .status.on { background: var(--green); }
+  .status.off { background: var(--red); }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="header">
+<div class="container">
+  <header>
     <div>
-      <div class="title">BTC/USDT</div>
-      <div class="sub">Binance Live · 100ms</div>
+      <h1>₿ BTC Multi-Timeframe Signal</h1>
+      <div class="meta"><span id="status" class="status off"></span><span id="statusText">Waiting...</span></div>
     </div>
-    <div class="price" id="livePrice">--</div>
+    <button id="refresh" onclick="refresh()">Refresh</button>
+  </header>
+
+  <div id="signalBox" class="signal-box signal-NEUTRAL">
+    <p class="signal-label" id="signalLabel">LOADING</p>
+    <p class="signal-reason" id="signalReason">Fetching data from Binance...</p>
   </div>
 
-  <div class="panel">
-    <div class="row head"><span>Price (USDT)</span><span class="amt">Amount (BTC)</span><span class="tot">Total</span></div>
-    <div id="asks" class="list"></div>
-    <div class="mid" id="spread">Spread: --</div>
-    <div id="bids" class="list"></div>
+  <div class="card">
+    <div class="grid">
+      <div class="stat"><div class="stat-label">Price</div><div class="stat-value" id="price">—</div></div>
+      <div class="stat"><div class="stat-label">ATR (14) 4H</div><div class="stat-value" id="atr">—</div></div>
+      <div class="stat"><div class="stat-label">RSI (14) 4H</div><div class="stat-value" id="rsi">—</div></div>
+      <div class="stat"><div class="stat-label">2D Trend</div><div class="stat-value" id="trend">—</div></div>
+    </div>
+
+    <div class="levels" id="levels" style="display:none;">
+      <div class="level stop"><div class="level-label">Stop Loss (1.5× ATR)</div><div class="level-value" id="stop">—</div></div>
+      <div class="level target"><div class="level-label">Take Profit (3× ATR)</div><div class="level-value" id="target">—</div></div>
+    </div>
+
+    <div class="error" id="error"></div>
   </div>
-  <div class="status"><span class="dot"></span><span id="status">Connecting to Binance...</span></div>
+
+  <div class="card">
+    <div class="stat-label" style="margin-bottom:8px;">Indicator Detail</div>
+    <div class="grid">
+      <div class="stat"><div class="stat-label">4H EMA 20</div><div class="stat-value" id="ema4h20">—</div></div>
+      <div class="stat"><div class="stat-label">4H EMA 50</div><div class="stat-value" id="ema4h50">—</div></div>
+      <div class="stat"><div class="stat-label">4H MACD</div><div class="stat-value" id="macd4h">—</div></div>
+      <div class="stat"><div class="stat-label">2D EMA 20</div><div class="stat-value" id="ema2d20">—</div></div>
+      <div class="stat"><div class="stat-label">2D EMA 50</div><div class="stat-value" id="ema2d50">—</div></div>
+      <div class="stat"><div class="stat-label">Last Update</div><div class="stat-value" id="updated" style="font-size:13px;">—</div></div>
+    </div>
+  </div>
+
+  <div class="footer">Educational only. Not financial advice. Auto-refresh every 5 min.</div>
 </div>
 
 <script>
-const ROWS_TO_SHOW = 10;
-const asksEl = document.getElementById('asks');
-const bidsEl = document.getElementById('bids');
-const livePrice = document.getElementById('livePrice');
-const spreadEl = document.getElementById('spread');
-const statusEl = document.getElementById('status');
+// ============ CONFIG ============
+const CONFIG = {
+  symbol: "BTCUSDT",
+  apiBase: "https://api.binance.com",
+  trendTF: "2d",
+  entryTF: "4h",
+  trendLimit: 120,
+  entryLimit: 300,
+  emaFast: 20,
+  emaSlow: 50,
+  rsiLen: 14,
+  atrLen: 14,
+  macdFast: 12, macdSlow: 26, macdSignal: 9,
+  rsiLongMax: 70,
+  rsiShortMin: 30,
+  slMult: 1.5,
+  tpMult: 3.0,
+  autoRefreshMs: 5 * 60 * 1000,
+};
 
-const fmt = (n,d=2) => Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
-
-// 构建固定行，后续只更新文本和条形宽度
-function buildRows(container, count) {
-  container.innerHTML = '';
-  const rows = [];
-  for(let i=0; i<count; i++){
-    const row = document.createElement('div');
-    row.className = 'row';
-    row.innerHTML = `<span class="bar"></span><span class="p"></span><span class="amt"></span><span class="tot"></span>`;
-    container.appendChild(row);
-    rows.push({
-      el: row,
-      bar: row.querySelector('.bar'),
-      p: row.querySelector('.p'),
-      amt: row.querySelector('.amt'),
-      tot: row.querySelector('.tot')
-    });
-  }
-  return rows;
+// ============ DATA FETCH ============
+async function fetchKlines(tf, limit) {
+  const url = `${CONFIG.apiBase}/api/v3/klines?symbol=${CONFIG.symbol}&interval=${tf}&limit=${limit}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+  const raw = await res.json();
+  return raw.map(k => ({
+    time: k[0],
+    open: parseFloat(k[1]),
+    high: parseFloat(k[2]),
+    low: parseFloat(k[3]),
+    close: parseFloat(k[4]),
+    volume: parseFloat(k[5]),
+  }));
 }
 
-const askRows = buildRows(asksEl, ROWS_TO_SHOW);
-const bidRows = buildRows(bidsEl, ROWS_TO_SHOW);
-
-function updateBook(asks, bids) {
-  if(!asks || !bids || asks.length === 0 || bids.length === 0) return;
-
-  // Binance depth20 返回的已经是按价格排序好的数组
-  // asks: 价格从低到高，bids: 价格从高到低
-  const bestBid = parseFloat(bids[0][0]);
-  const bestAsk = parseFloat(asks[0][0]);
-
-  livePrice.textContent = '$' + fmt(bestBid);
-  spreadEl.textContent = 'Spread: ' + fmt(bestAsk - bestBid);
-
-  // 计算最大挂单量用于条形宽度
-  let maxTotal = 0;
-  for(let i=0; i<Math.min(ROWS_TO_SHOW, asks.length); i++) {
-    const p = parseFloat(asks[i][0]), a = parseFloat(asks[i][1]);
-    maxTotal = Math.max(maxTotal, p * a);
+// ============ INDICATORS ============
+function ema(values, length) {
+  const k = 2 / (length + 1);
+  const out = new Array(values.length).fill(null);
+  if (values.length < length) return out;
+  let sum = 0;
+  for (let i = 0; i < length; i++) sum += values[i];
+  let prev = sum / length;
+  out[length - 1] = prev;
+  for (let i = length; i < values.length; i++) {
+    prev = values[i] * k + prev * (1 - k);
+    out[i] = prev;
   }
-  for(let i=0; i<Math.min(ROWS_TO_SHOW, bids.length); i++) {
-    const p = parseFloat(bids[i][0]), a = parseFloat(bids[i][1]);
-    maxTotal = Math.max(maxTotal, p * a);
-  }
+  return out;
+}
 
-  // 填充卖单（asks），从上到下价格递增，最优卖价在最下面
-  for(let i=0; i<ROWS_TO_SHOW; i++) {
-    const row = askRows[i];
-    // asks 数组是低到高，我们要反向显示，让最低卖价在最靠近中间的位置
-    const data = asks[ROWS_TO_SHOW - 1 - i];
-    if(data) {
-      const p = parseFloat(data[0]), a = parseFloat(data[1]);
-      const total = p * a;
-      row.el.className = 'row ask';
-      row.p.textContent = fmt(p);
-      row.amt.textContent = a.toFixed(4);
-      row.tot.textContent = fmt(total, 0);
-      row.bar.style.width = Math.min(100, (total/maxTotal)*100) + '%';
-    } else {
-      row.el.className = 'row';
-      row.p.textContent = '';
-      row.amt.textContent = '';
-      row.tot.textContent = '';
-      row.bar.style.width = '0%';
+function rsi(values, length) {
+  const out = new Array(values.length).fill(null);
+  if (values.length < length + 1) return out;
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= length; i++) {
+    const diff = values[i] - values[i - 1];
+    if (diff >= 0) gains += diff; else losses -= diff;
+  }
+  let avgGain = gains / length;
+  let avgLoss = losses / length;
+  out[length] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+  for (let i = length + 1; i < values.length; i++) {
+    const diff = values[i] - values[i - 1];
+    const gain = diff > 0 ? diff : 0;
+    const loss = diff < 0 ? -diff : 0;
+    avgGain = (avgGain * (length - 1) + gain) / length;
+    avgLoss = (avgLoss * (length - 1) + loss) / length;
+    out[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+  }
+  return out;
+}
+
+function atr(highs, lows, closes, length) {
+  const trs = new Array(closes.length).fill(null);
+  for (let i = 1; i < closes.length; i++) {
+    trs[i] = Math.max(
+      highs[i] - lows[i],
+      Math.abs(highs[i] - closes[i - 1]),
+      Math.abs(lows[i] - closes[i - 1])
+    );
+  }
+  const out = new Array(closes.length).fill(null);
+  if (closes.length < length + 1) return out;
+  let sum = 0;
+  for (let i = 1; i <= length; i++) sum += trs[i];
+  let prev = sum / length;
+  out[length] = prev;
+  for (let i = length + 1; i < closes.length; i++) {
+    prev = (prev * (length - 1) + trs[i]) / length;
+    out[i] = prev;
+  }
+  return out;
+}
+
+function macd(values, fast, slow, signal) {
+  const emaFast = ema(values, fast);
+  const emaSlow = ema(values, slow);
+  const macdLine = values.map((_, i) =>
+    emaFast[i] !== null && emaSlow[i] !== null ? emaFast[i] - emaSlow[i] : null
+  );
+  const validMacd = macdLine.filter(v => v !== null);
+  const signalArr = ema(validMacd, signal);
+  const signalLine = new Array(values.length).fill(null);
+  let idx = 0;
+  for (let i = 0; i < macdLine.length; i++) {
+    if (macdLine[i] !== null) {
+      signalLine[i] = signalArr[idx] ?? null;
+      idx++;
     }
   }
+  return { macdLine, signalLine };
+}
 
-  // 填充买单（bids），最优买价在最上面
-  for(let i=0; i<ROWS_TO_SHOW; i++) {
-    const row = bidRows[i];
-    const data = bids[i];
-    if(data) {
-      const p = parseFloat(data[0]), a = parseFloat(data[1]);
-      const total = p * a;
-      row.el.className = 'row bid';
-      row.p.textContent = fmt(p);
-      row.amt.textContent = a.toFixed(4);
-      row.tot.textContent = fmt(total, 0);
-      row.bar.style.width = Math.min(100, (total/maxTotal)*100) + '%';
-    } else {
-      row.el.className = 'row';
-      row.p.textContent = '';
-      row.amt.textContent = '';
-      row.tot.textContent = '';
-      row.bar.style.width = '0%';
+// ============ ANALYSIS ============
+function analyze(entry, trend) {
+  const closesE = entry.map(c => c.close);
+  const closesT = trend.map(c => c.close);
+
+  const emaFastE = ema(closesE, CONFIG.emaFast);
+  const emaSlowE = ema(closesE, CONFIG.emaSlow);
+  const rsiE = rsi(closesE, CONFIG.rsiLen);
+  const atrE = atr(entry.map(c => c.high), entry.map(c => c.low), closesE, CONFIG.atrLen);
+  const macdE = macd(closesE, CONFIG.macdFast, CONFIG.macdSlow, CONFIG.macdSignal);
+
+  const emaFastT = ema(closesT, CONFIG.emaFast);
+  const emaSlowT = ema(closesT, CONFIG.emaSlow);
+
+  // Use last CLOSED candle (index length - 2)
+  const iE = entry.length - 2;
+  const iT = trend.length - 2;
+
+  const price = entry[iE].close;
+  const atrVal = atrE[iE];
+  const rsiVal = rsiE[iE];
+  const macdLineVal = macdE.macdLine[iE];
+  const macdSigVal = macdE.signalLine[iE];
+
+  const trendFast = emaFastT[iT];
+  const trendSlow = emaSlowT[iT];
+
+  const trendBull = trendFast > trendSlow;
+  const trendBear = trendFast < trendSlow;
+  const macdBull = macdLineVal > macdSigVal;
+  const macdBear = macdLineVal < macdSigVal;
+
+  let signal = "NEUTRAL";
+  let reason = "No confluence";
+
+  if (trendBull && macdBull && rsiVal < CONFIG.rsiLongMax) {
+    signal = "LONG";
+    reason = `2D uptrend + 4H MACD bull + RSI ${rsiVal.toFixed(1)} < ${CONFIG.rsiLongMax}`;
+  } else if (trendBear && macdBear && rsiVal > CONFIG.rsiShortMin) {
+    signal = "SHORT";
+    reason = `2D downtrend + 4H MACD bear + RSI ${rsiVal.toFixed(1)} > ${CONFIG.rsiShortMin}`;
+  } else if (trendBull && !macdBull) {
+    reason = "2D bullish but 4H momentum bearish (wait)";
+  } else if (trendBear && !macdBear) {
+    reason = "2D bearish but 4H momentum bullish (wait)";
+  } else if (trendBull && rsiVal >= CONFIG.rsiLongMax) {
+    reason = "2D bullish but 4H RSI overbought (wait)";
+  } else if (trendBear && rsiVal <= CONFIG.rsiShortMin) {
+    reason = "2D bearish but 4H RSI oversold (wait)";
+  }
+
+  let stop = null, target = null;
+  if (signal === "LONG") {
+    stop = price - CONFIG.slMult * atrVal;
+    target = price + CONFIG.tpMult * atrVal;
+  } else if (signal === "SHORT") {
+    stop = price + CONFIG.slMult * atrVal;
+    target = price - CONFIG.tpMult * atrVal;
+  }
+
+  return {
+    signal, reason, price, atr: atrVal, rsi: rsiVal,
+    ema4h20: emaFastE[iE], ema4h50: emaSlowE[iE],
+    macd4h: macdLineVal - macdSigVal,
+    ema2d20: trendFast, ema2d50: trendSlow,
+    stop, target,
+  };
+}
+
+// ============ UI ============
+const fmt = (v) => v === null || v === undefined || isNaN(v) ? "—" :
+  "$" + v.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+
+function render(r) {
+  const box = document.getElementById("signalBox");
+  box.className = "signal-box signal-" + r.signal;
+  document.getElementById("signalLabel").textContent = r.signal;
+  document.getElementById("signalReason").textContent = r.reason;
+
+  document.getElementById("price").textContent = fmt(r.price);
+  document.getElementById("atr").textContent = fmt(r.atr);
+  document.getElementById("rsi").textContent = r.rsi.toFixed(2);
+
+  const trendEl = document.getElementById("trend");
+  if (r.ema2d20 > r.ema2d50) {
+    trendEl.textContent = "BULLISH";
+    trendEl.style.color = "var(--green)";
+  } else {
+    trendEl.textContent = "BEARISH";
+    trendEl.style.color = "var(--red)";
+  }
+
+  document.getElementById("ema4h20").textContent = fmt(r.ema4h20);
+  document.getElementById("ema4h50").textContent = fmt(r.ema4h50);
+
+  const macdEl = document.getElementById("macd4h");
+  macdEl.textContent = r.macd4h.toFixed(2);
+  macdEl.style.color = r.macd4h >= 0 ? "var(--green)" : "var(--red)";
+
+  document.getElementById("ema2d20").textContent = fmt(r.ema2d20);
+  document.getElementById("ema2d50").textContent = fmt(r.ema2d50);
+
+  const levels = document.getElementById("levels");
+  if (r.stop !== null && r.target !== null) {
+    levels.style.display = "grid";
+    document.getElementById("stop").textContent = fmt(r.stop);
+    document.getElementById("target").textContent = fmt(r.target);
+  } else {
+    levels.style.display = "none";
+  }
+
+  document.getElementById("updated").textContent =
+    new Date().toLocaleTimeString();
+}
+
+function setStatus(ok, msg) {
+  const el = document.getElementById("status");
+  el.className = "status " + (ok ? "on" : "off");
+  document.getElementById("statusText").textContent = msg;
+}
+
+// ============ MAIN ============
+async function refresh() {
+  const btn = document.getElementById("refresh");
+  btn.disabled = true;
+  document.getElementById("error").textContent = "";
+  setStatus(false, "Fetching...");
+  try {
+    const [entry, trend] = await Promise.all([
+      fetchKlines(CONFIG.entryTF, CONFIG.entryLimit),
+      fetchKlines(CONFIG.trendTF, CONFIG.trendLimit),
+    ]);
+    if (entry.length < 60 || trend.length < 60) {
+      throw new Error("Not enough candles returned");
     }
+    const result = analyze(entry, trend);
+    render(result);
+    setStatus(true, "Live • auto-refresh every 5 min");
+  } catch (err) {
+    console.error(err);
+    document.getElementById("error").textContent =
+      "Error: " + err.message +
+      " — If Binance is blocked in your region, try a VPN or swap apiBase to a mirror (e.g. https://api.binance.us for US users).";
+    setStatus(false, "Error");
+  } finally {
+    btn.disabled = false;
   }
 }
 
-let ws;
-function connect() {
-  // Binance 公共现货数据流，无需 API Key
-  // depth20@100ms: 前20档快照，每100ms推送一次
-  ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@depth20@100ms');
-
-  ws.onopen = () => {
-    statusEl.textContent = 'Live (Binance · 100ms)';
-  };
-
-  ws.onmessage = (e) => {
-    const data = JSON.parse(e.data);
-    // depth20 流直接返回 { lastUpdateId, bids: [...], asks: [...] }
-    if(data.bids && data.asks) {
-      updateBook(data.asks, data.bids);
-    }
-  };
-
-  ws.onclose = () => {
-    statusEl.textContent = 'Reconnecting...';
-    setTimeout(connect, 2000);
-  };
-
-  ws.onerror = () => {
-    ws.close();
-  };
-}
-
-connect();
+refresh();
+setInterval(refresh, CONFIG.autoRefreshMs);
 </script>
 </body>
 </html>
